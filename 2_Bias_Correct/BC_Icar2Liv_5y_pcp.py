@@ -209,7 +209,8 @@ if __name__ == '__main__':
     # set paths based on cmip:
     base_in  = f"/glade/derecho/scratch/bkruyt/{CMIP}/WUS_icar_LivGrd2"   # derecho
     # path_out = f"/glade/campaign/ral/hap/bert/{CMIP}/WUS_icar_livBC"
-    path_out = f"/glade/campaign/ral/hap/bert/{CMIP}/WUS_icar_livBC2"  # <--- !!
+    # path_out = f"/glade/campaign/ral/hap/bert/{CMIP}/WUS_icar_livBC2"  # <--- !!
+    path_out = f"/glade/campaign/ral/hap/bert/{CMIP}/WUS_icar_livBC_noNoise"  # <--- !!
 
     # create out dir if it does not exist
     if not os.path.exists(f"{path_out}/{model}_{scen}/{dt}_pcp"):
@@ -266,8 +267,8 @@ if __name__ == '__main__':
     elif int(args.part)==3:  # custom
         # time_s=['2045-01-01', '2050-01-01']
         # time_f=['2049-12-31', '2054-12-31']
-        time_s=['2085-01-01']  # cmcc 245
-        time_f=['2089-12-31']
+        time_s=['2050-01-01']
+        time_f=['2054-12-31']
         ts=0
 
 

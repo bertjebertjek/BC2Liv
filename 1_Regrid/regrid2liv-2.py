@@ -167,7 +167,6 @@ if __name__ == '__main__':
 
         # - - - - - C. Define data to match:  (Livneh) - - - - -
         dsICAR1=xr.open_dataset(files[0]).load() # load 1 ICAR file for the regridder
-        livneh_pr = get_livneh(icar_pcp=dsICAR1.isel(time=0)).load()
 
         if 'precipitation' in dsICAR1.data_vars:
             pcp_var='precipitation'
@@ -177,16 +176,21 @@ if __name__ == '__main__':
             print(" ERROR: Precipitation variable name unclear!  Stopping")
             sys.exit()
 
+        print(f" files[0]: {files[0]}")
+        print('\n  dsICAR1 shape' , dsICAR1[pcp_var].shape)
+        print( dsICAR1.isel(time=0) )
+        livneh_pr = get_livneh(icar_pcp=dsICAR1.isel(time=0)).load()
+        print('\n  livneh_pr shape' , livneh_pr.shape)
+
         # - - - - -  define regridder  - - - - - - - -
         if crop:
             ICAR_grid_with_bounds = i2g.get_latlon_b(
             dsICAR1[pcp_var].isel(time=0).isel(
                 lon_x=slice(crop_size,-crop_size)).isel(lat_y=slice(crop_size,-crop_size)),
-            lon_str='lon',  lat_str='lat',
-            lon_dim='lon_x', lat_dim='lat_y')
+                lon_str='lon',  lat_str='lat',
+                lon_dim='lon_x', lat_dim='lat_y')
         else:
             ICAR_grid_with_bounds = i2g.get_latlon_b(
-                # dsICAR1['precipitation'].isel(time=0),
                 dsICAR1[pcp_var].isel(time=0),
                 lon_str='lon',  lat_str='lat',
                 lon_dim='lon_x', lat_dim='lat_y')
@@ -194,7 +198,6 @@ if __name__ == '__main__':
         livneh_grid_with_bounds = i2g.get_latlon_b_rect(livneh_pr,lon_str='lon',lat_str='lat',lon_dim='lon',lat_dim='lat')
 
 
-        print('\n  livneh_pr shape' , livneh_pr.shape)
         # regridder = xe.Regridder(livneh_grid_with_bounds, ICAR_grid_with_bounds, 'conservative')
         regridder2 = xe.Regridder( ICAR_grid_with_bounds, livneh_grid_with_bounds , 'conservative')
 
@@ -278,9 +281,6 @@ if __name__ == '__main__':
         #     files = glob.glob(f"{ICAR_nocp_path}/{model}_{scenario}/{dt}/{file_prefix}_{model}_{scen}_{year}-0*.nc")  #
 
         files = glob.glob(f"{ICAR_nocp_path}/{model}_{scenario}/{dt}/{file_prefix}_{model}_{scen}_{year}*.nc")  #  generic
-
-
-
 
         print("\n- - - - - - - - - -   opening ICAR file(s) to correct - - - - - - - - - - - - ")
         # print(files)

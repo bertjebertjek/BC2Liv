@@ -5,7 +5,7 @@
 #########################################################################################
 
 CMIP=CMIP6
-part=1     # part 1 = from start; part 2 = look for last output file and restart there : 3=custom (in case we need to rerun sth.)
+part=3     # part 1 = from start; part 2 = look for last output file and restart there : 3=custom (in case we need to rerun sth.)
 
 
 #-----------------    CMIP5    ------------------------
@@ -21,11 +21,11 @@ if [ "$CMIP" == "CMIP5" ] ; then
 elif [ "$CMIP" == "CMIP6" ] ; then
     # allMods=( CanESM5  )
     # allMods=( MIROC-ES2L )
-    # allMods=( CMCC-CM2-SR5 )
-    allMods=( CMCC-CM2-SR5 MPI-M.MPI-ESM1-2-LR )
+    allMods=( CMCC-CM2-SR5 )
+    # allMods=( MPI-M.MPI-ESM1-2-LR )
     # allMods=( NorESM2-MM  )
-    allScens=( hist ssp370 ssp245 ssp585 )
-    # allScens=( ssp245  )
+    # allScens=( hist ssp370 ssp245 ssp585 )
+    allScens=( ssp585 )
 fi
 
 #########################################################################################
@@ -78,7 +78,7 @@ for model in ${allMods[@]} ; do
     done
 done
 
-# # ___ clean up the generated job scripts?
+# # ___ clean up the generated job scripts? -> in template_submit_BC2liv.sh
 # wait 10
 # for model in ${allMods[@]} ; do
 #     for scen in ${allScens[@]} ; do

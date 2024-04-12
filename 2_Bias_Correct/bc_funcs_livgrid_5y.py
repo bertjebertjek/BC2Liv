@@ -28,13 +28,38 @@ sys.path
 
 import quantile_mapping # from same folder.
 
-noise_path = "/glade/derecho/scratch/bkruyt/CMIP6"
+
+
+noise_path  = "/glade/derecho/scratch/bkruyt/CMIP6"
+NOISE_u     = xr.open_dataset(f"{noise_path}/uniform_noise_480_480.nc" )
+noise_val   = 0.01
+
+######################################################
+############       FUNCTIONS           ###############
+######################################################
+
+def add_noise(df, noise_val):
+    """Add uniform noise to a 2D dataset df."""
+
+    with dask.config.set(**{'array.slicing.split_large_chunks': True}):
+
+        u_noise = NOISE_u.uniform_noise  #.load() # 55000 x 480 x480
+
+        # Add noise to (daily) input data:
+        # to avoid taking the same noise values every time, we add a random int.
+        t = len(df.time)
+        r = randrange(1000)
+        noise_arr = noise_val * u_noise[r:(r+t) , :df.shape[1], :df.shape[2] ]
+        df = xr.where( df>0, df + noise_val, noise_arr.values)
+
+        return df
+
 
 ######################################################
 ###############    PRECIPITATION    ##################
 ######################################################
 
-def correct_precip(this_ds, dsObs, dsRef,  bc_by_month=False):
+def correct_precip(this_ds, dsObs, dsRef,  bc_by_month=False, noise=True):
     """ this ds and dsRef: datasets with the same precipiation variable, dsObs is DataArray"""
     t0 = time.time()
 
@@ -75,7 +100,7 @@ def correct_precip(this_ds, dsObs, dsRef,  bc_by_month=False):
         print( 'define time-step precipitation variable!' )
 
     t0 = time.time()
-    # print("   loading timestep precip")
+
     print("   loading data")
 
     try: # pcp_var in this_ds.data_vars:
@@ -84,14 +109,6 @@ def correct_precip(this_ds, dsObs, dsRef,  bc_by_month=False):
         pr    =  this_ds.load()
 
     # dsObs =  dsObs#.load()
-
-    ## dsRef should be dataArray, not dataset
-    # if pcp_var in dsRef.data_vars:
-    #     dsRef =  dsRef[pcp_var].load()  # should already be loaded, but calling load twice is ok (?)
-    # else:
-    #     dsRef =  dsRef
-        # print(" ! ! !  Error: precipitation variable not the same in Ref and input datasets! Stopping")
-        # sys.exit()
 
     print("      ", time.time() - t0)
 
@@ -110,26 +127,32 @@ def correct_precip(this_ds, dsObs, dsRef,  bc_by_month=False):
 
     #______________ add noise _____________
     t0 = time.time()
-    print("   adding noise to input and ref data")
-    with dask.config.set(**{'array.slicing.split_large_chunks': True}):
+    # Add noise to (daily) input and Reference data:
+    if noise:
+        print(f"   adding noise to input and ref data with max val {noise_val}")
+        daily = add_noise(daily)
+        dsRef = add_noise(dsRef)
+    else:
+        print("   ! ! !  NOT adding noise to input and ref data  ! ! !")
 
-        NOISE_u = xr.open_dataset(f"{noise_path}/uniform_noise_480_480.nc" )
-        u_noise = NOISE_u.uniform_noise  #.load() # 55000 x 480 x480
-        noise_val= 0.01
 
-        # Add noise to (daily) input data:
-        # to avoid taking the same noise values every time, we add a random int.
-        t = len(daily.time)
-        r = randrange(1000)
-        noise_arr = noise_val * u_noise[r:(r+t) , :daily.shape[1], :daily.shape[2] ]
-        daily = xr.where( daily>0, daily + noise_val, noise_arr.values)
+    # with dask.config.set(**{'array.slicing.split_large_chunks': True}):
+    #     NOISE_u = xr.open_dataset(f"{noise_path}/uniform_noise_480_480.nc" )
+    #     u_noise = NOISE_u.uniform_noise  #.load() # 55000 x 480 x480
+    #     noise_val= 0.01
+    #     # Add noise to (daily) input data:
+    #     # to avoid taking the same noise values every time, we add a random int.
+    #     t = len(daily.time)
+    #     r = randrange(1000)
+    #     noise_arr = noise_val * u_noise[r:(r+t) , :daily.shape[1], :daily.shape[2] ]
+    #     daily = xr.where( daily>0, daily + noise_val, noise_arr.values)
 
-        # Also add noise to ref data:
-        t = len(dsRef.time)
-        r = randrange(1000) # use a different random (r) value for Ref(?)
-        noise_arr = noise_val * u_noise[r:(r+t) , :daily.shape[1], :daily.shape[2] ]
-        # # only the values that are 0 should get noise added, the values that aren’t 0 should get 0.1 (or whatever) added to them
-        dsRef = xr.where( dsRef>0, dsRef + noise_val, noise_arr.values)
+        # # Also add noise to ref data:
+        # t = len(dsRef.time)
+        # r = randrange(1000) # use a different random (r) value for Ref(?)
+        # noise_arr = noise_val * u_noise[r:(r+t) , :daily.shape[1], :daily.shape[2] ]
+        # # # only the values that are 0 should get noise added, the values that aren’t 0 should get 0.1 (or whatever) added to them
+        # dsRef = xr.where( dsRef>0, dsRef + noise_val, noise_arr.values)
 
     print("      ", time.time() - t0)
 

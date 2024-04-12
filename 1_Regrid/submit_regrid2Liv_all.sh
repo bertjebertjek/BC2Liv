@@ -1,6 +1,6 @@
 #!/bin/bash
 #PBS -l select=1:ncpus=1:mem=20GB
-#PBS -l walltime=05:00:00
+#PBS -l walltime=01:00:00
 #PBS -A P48500028
 #PBS -q casper
 #PBS -N rgr2Liv
@@ -54,11 +54,12 @@ if [ "$CMIP" == "CMIP5" ] ; then
     allScens=( rcp45_2050_2100 rcp85_2050_2100  )
 elif [ "$CMIP" == "CMIP6" ] ; then
     # allMods=( CanESM5 )  NorESM2-MM
-    # allMods=( CMCC-CM2-SR5)
-    allMods=(  MPI-M.MPI-ESM1-2-LR )
+    allMods=( CMCC-CM2-SR5)
+    # allMods=(  MPI-M.MPI-ESM1-2-LR )
     # allMods=(MIROC-ES2L )
-    allScens=(  hist ssp245_2004 ssp245_2049 ssp370_2004 ssp370_2049 ssp585_2004 ssp585_2049 )
-    # allScens=( hist ) # ssp370_2004 ssp585_2004)ssp245_2004 ssp585_2004 ssp585_2049
+    # allScens=(  hist ssp245_2004 ssp245_2049 ssp370_2004 ssp370_2049 ssp585_2004 ssp585_2049 )
+    allScens=( ssp585_2049 ) # ssp370_2004 ssp585_2004)ssp245_2004 ssp585_2004 ssp585_2049
+    # allScens=( ssp245_2049 )
 fi
 
 # alldts=( daily 3hr )
