@@ -5,7 +5,7 @@
 #########################################################################################
 
 CMIP=CMIP6
-part=3     # part 1 = from start; part 2 = look for last output file and restart there : 3=custom (in case we need to rerun sth.)
+part=2    # part 1 = from start; part 2 = look for last output file and restart there : 3=custom (in case we need to rerun sth.)
 
 
 #-----------------    CMIP5    ------------------------
@@ -24,8 +24,9 @@ elif [ "$CMIP" == "CMIP6" ] ; then
     allMods=( CMCC-CM2-SR5 )
     # allMods=( MPI-M.MPI-ESM1-2-LR )
     # allMods=( NorESM2-MM  )
-    # allScens=( hist ssp370 ssp245 ssp585 )
-    allScens=( ssp585 )
+    # allMods=( MIROC-ES2L  CMCC-CM2-SR5  )
+    # allScens=( ssp370 ssp245 ssp585 ) # hist
+    allScens=( ssp245 )
 fi
 
 #########################################################################################

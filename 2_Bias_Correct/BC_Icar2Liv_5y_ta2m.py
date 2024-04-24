@@ -241,7 +241,7 @@ if __name__ == '__main__':
     print( args.model, args.scenario, args.dt, ' part', args.part,  CMIP)
     print(' ########################################################', '\n')
 
-    base_in  = f"/glade/campaign/ral/hap/bert/{CMIP}/WUS_icar_livBC2" # PCP in! #
+    base_in  = f"/glade/campaign/ral/hap/bert/{CMIP}/WUS_icar_livBC2" # PCP in! # This needs to be the same as path_out in BC_Icar2Liv_5y_pcp.py !!!
     ref_in   = f"/glade/derecho/scratch/bkruyt/{CMIP}/WUS_icar_LivGrd2"  # referenece files
     path_out = f"/glade/campaign/ral/hap/bert/{CMIP}/WUS_icar_livBC2"
 

@@ -211,9 +211,9 @@ if __name__ == '__main__':
     # path_out = f"/glade/campaign/ral/hap/bert/{CMIP}/WUS_icar_livBC"
     # path_out = f"/glade/campaign/ral/hap/bert/{CMIP}/WUS_icar_livBC2"  # <--- !!
 
-    ## TEST witout noise
-    noise = False  # test
-    path_out = f"/glade/campaign/ral/hap/bert/{CMIP}/WUS_icar_livBC_noNoise"  # <--- !!
+    ## TEST
+    noise = True  # test
+    path_out = f"/glade/campaign/ral/hap/bert/{CMIP}/WUS_icar_livBC3"  # <--- !!
 
     # create out dir if it does not exist
     if not os.path.exists(f"{path_out}/{model}_{scen}/{dt}_pcp"):
@@ -301,7 +301,7 @@ if __name__ == '__main__':
         pcp_var_R='Prec'
     elif 'precipitation' in dsR.data_vars:
         pcp_var_R='precipitation'
-    print(f"Ref data precip var is {pcp_var_R}")
+    print(f"      Ref data precip var is {pcp_var_R}")
 
 
     try:

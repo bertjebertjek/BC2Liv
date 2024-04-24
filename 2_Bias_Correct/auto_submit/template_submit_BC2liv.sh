@@ -1,6 +1,6 @@
 #!/bin/bash
-#PBS -l select=1:ncpus=1:mem=150GB
-#PBS -l walltime=07:00:00
+#PBS -l select=1:ncpus=1:mem=350GB
+#PBS -l walltime=12:00:00
 #PBS -A P48500028
 #PBS -q casper
 #PBS -N p___JOBNAME__
@@ -43,7 +43,7 @@ part=__part__  # part 1 = from start; part 2 = look for last output file and res
 cat <<EOS | qsub -W depend=afterany:${PBS_JOBID}
     #!/bin/bash
 
-    #PBS -l select=1:ncpus=1:mem=150GB
+    #PBS -l select=1:ncpus=1:mem=350GB
     #PBS -l walltime=12:00:00
     #PBS -A P48500028
     #PBS -q casper

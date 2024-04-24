@@ -43,9 +43,10 @@ warnings.simplefilter("ignore", category=Warning) #SerializationWarning ?
 ############################################
 #                Settings
 ############################################
-bc_by_month=True
+bc_by_month = True  # bias correct per month (default=True)
+noise       = True  # add noise to the daily values in the bias correction procedure (default=True)
+test        = False # reduces datasets for faster processing, incorrect results!
 
-test = False # reduces datasets for faster processing, incorrect results!
 
 
 ############################################
@@ -209,8 +210,9 @@ if __name__ == '__main__':
     # set paths based on cmip:
     base_in  = f"/glade/derecho/scratch/bkruyt/{CMIP}/WUS_icar_LivGrd2"   # derecho
     # path_out = f"/glade/campaign/ral/hap/bert/{CMIP}/WUS_icar_livBC"
-    # path_out = f"/glade/campaign/ral/hap/bert/{CMIP}/WUS_icar_livBC2"  # <--- !!
-    path_out = f"/glade/campaign/ral/hap/bert/{CMIP}/WUS_icar_livBC_noNoise"  # <--- !!
+    path_out = f"/glade/campaign/ral/hap/bert/{CMIP}/WUS_icar_livBC2"  # <--- !!
+
+    verbose=True  # more print statements at runtime.
 
     # create out dir if it does not exist
     if not os.path.exists(f"{path_out}/{model}_{scen}/{dt}_pcp"):
@@ -298,16 +300,18 @@ if __name__ == '__main__':
         pcp_var_R='Prec'
     elif 'precipitation' in dsR.data_vars:
         pcp_var_R='precipitation'
-    print(f"Ref data precip var is {pcp_var_R}")
+    print(f"      Ref data precip var is {pcp_var_R}")
 
 
     try:
-        dsRef_full = dsR[pcp_var_R].resample(time='1D').sum(dim='time').load()
-        # dsRef_full = dsR["precipitation"].load()
+        if dt is not "daily":
+            dsRef_full = dsR[pcp_var_R].resample(time='1D').sum(dim='time').load()
+        else:
+            dsRef_full = dsR[pcp_var_R].load()
     except:
         print("ERROR:  could not load or resample ref data.")
         sys.exit()
-        dsRef_full = dsR["Prec"].load()
+        # dsRef_full = dsR[pcp_var_R].load()
     # elif CMIP=="CMIP5":
     #     dsRef_full = xr.open_mfdataset( files_ref)['Prec'].load()
 
@@ -353,7 +357,7 @@ if __name__ == '__main__':
 
 
         # --------  the bias correction functions    ---------
-        pcp_corrected_ds = correct_precip( this_ds=dsI_in, dsObs=livneh_pr, dsRef=dsRef_ex5y,   bc_by_month=bc_by_month)
+        pcp_corrected_ds = correct_precip( this_ds=dsI_in, dsObs=livneh_pr, dsRef=dsRef_ex5y,   bc_by_month=bc_by_month, noise=noise, verbose=verbose)
 
 
         print("      Memory use after bc:")
