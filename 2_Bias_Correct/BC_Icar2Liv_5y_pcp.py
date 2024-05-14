@@ -95,6 +95,25 @@ def get_icar_filelist(start_year, end_year, dt="3hr"): #,base_in=""):
     return sorted(files)
 
 
+def get_icar_filelist_CMIP5(start_year, end_year, dt="daily"): # Ryan has CMIP5 daily w/o cp, so use those for reference:
+    base_CMIP5 = "/glade/campaign/ral/hap/currierw/icar/output"
+
+    if scen[:4]=="hist" and CMIP=="CMIP5":
+        scen_load="rcp45"
+
+    files=[]
+    for y in range(int(start_year), int(end_year)+1) :
+
+        if CMIP=="CMIP5":
+            files.extend( glob.glob(f'{base_CMIP5}/{model}_historical/{dt}/icar_*_{y}*.nc') )
+            files.extend( glob.glob(f'{base_CMIP5}/{model}_{scen_load}_2005_2050/{dt}/icar_*_{y}*.nc') )
+            files.extend( glob.glob(f'{base_CMIP5}/{model}_{scen_load}_2050_2100/{dt}/icar_*_{y}*.nc') )
+
+    err_path=f'{base_CMIP5}/{model}_{scen_load}_XXXX'
+    if len(files)==0: print(f"\n ERROR: could not load files from {err_path}")
+
+    return sorted(files)
+
 
 def get_livneh(icar_1file):
     """get livneh data, cropped to the icar grid (defined by icar_1file)"""
@@ -208,9 +227,10 @@ if __name__ == '__main__':
     print(' ########################################################', '\n')
 
     # set paths based on cmip:
-    base_in  = f"/glade/derecho/scratch/bkruyt/{CMIP}/WUS_icar_LivGrd2"   # derecho
+    base_in  = f"/glade/derecho/scratch/bkruyt/{CMIP}/WUS_icar_LivGrd3"   # lakes masked in ta2m only
     # path_out = f"/glade/campaign/ral/hap/bert/{CMIP}/WUS_icar_livBC"
-    path_out = f"/glade/campaign/ral/hap/bert/{CMIP}/WUS_icar_livBC2"  # <--- !!
+    # path_out = f"/glade/campaign/ral/hap/bert/{CMIP}/WUS_icar_livBC2"  # <--- !!
+    path_out = f"/glade/campaign/ral/hap/bert/{CMIP}/WUS_icar_livBC3"  # <--- !! lakes maskes ta2m only
 
     verbose=True  # more print statements at runtime.
 
@@ -288,7 +308,10 @@ if __name__ == '__main__':
 
     # # get file list for full ref period: !! load 3hr, then make daily files, cause we need daily for bias correction.
     # files_ref = get_icar_filelist(ref_start.split('-')[0], ref_end.split('-')[0], dt="daily")
-    files_ref = get_icar_filelist(ref_start.split('-')[0], ref_end.split('-')[0], dt="3hr")
+    if CMIP=="CMIP6":
+        files_ref = get_icar_filelist(ref_start.split('-')[0], ref_end.split('-')[0], dt="3hr")
+    elif CMIP=="CMIP5":
+        files_ref = get_icar_filelist_CMIP5(ref_start.split('-')[0], ref_end.split('-')[0], dt="yearly")
 
     print(f"   loading {len(files_ref)} icar files: {files_ref[0].split('/')[-1]} to {files_ref[-1].split('/')[-1]} ")
     # print(files_ref)

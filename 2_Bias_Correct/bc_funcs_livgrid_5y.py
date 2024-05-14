@@ -63,7 +63,7 @@ def add_noise(df, noise_val=noise_val, random=True):
 ######################################################
 
 def correct_precip(this_ds, dsObs, dsRef,  bc_by_month=False, noise=True, verbose=False):
-    """ this ds and dsRef: datasets with the same precipiation variable, dsObs is DataArray"""
+    """ this ds and dsRef: datasets with the same precipiation variable, dsObs is DataArray with observations ('data to match') """
     t0 = time.time()
 
     if bc_by_month:
@@ -185,27 +185,24 @@ def correct_precip(this_ds, dsObs, dsRef,  bc_by_month=False, noise=True, verbos
     # Create a mask for elements where daily sum is zero and bc_daily is positive
     mask = (daily == 0) & (bc_daily > 0)
     mask = np.repeat(mask.values, (24 / tdelta_int), axis=0)
-    if verbose:
-        print(f"      mask shape: {mask.shape}")
-        print(f"      correction shape: {correction.shape} ") # \n
-
-
     #__ Set values to scaled bc_daily where daily sum is zero and bc_daily is positive __
     #   method='zero': when resampled to daily again, the values 'line up"
     bc_tdelta =  bc_daily.interp(time=da_pcp.time, method='zero') /(24 / tdelta_int)
 
     if verbose:
+        print(f"      mask shape: {mask.shape}")
+        print(f"      correction shape: {correction.shape} ") # \n
         print(f"      bc_tdelta shape: {bc_tdelta.shape}")
-        print(f"\n   bc_daily.time: {bc_daily.time}" )
-        print(f"   bc_tdelta.time: {bc_tdelta.time}" )
-        print(f"\n   bc_daily.values[:12]: {bc_daily.values[:12,150,150]}" )
-        print(f"   bc_tdelta.values[:12]: {bc_tdelta.values[:12, 150,150]}" )
-        print(f"\n   sum(bc_daily.sel(time=slice(1950-01-01,1950-01-10)).values): {sum(bc_daily.sel(time=slice('1950-01-01','1950-01-10'))[:,150,150].values)}" )
-        print(f"   sum(bc_tdelta.sel(time=slice('1950-01-01','1950-01-10')).values):{sum(bc_tdelta.sel(time=slice('1950-01-01','1950-01-10'))[:,150,150].values)}" )
+        # print(f"\n   bc_daily.time: {bc_daily.time}" )
+        # print(f"   bc_tdelta.time: {bc_tdelta.time}" )
+        # print(f"\n   bc_daily.values[:12]: {bc_daily.values[:12,150,150]}" )
+        # print(f"   bc_tdelta.values[:12]: {bc_tdelta.values[:12, 150,150]}" )
+        # print(f"\n   sum(bc_daily.sel(time=slice(1950-01-01,1950-01-10)).values): {sum(bc_daily.sel(time=slice('1950-01-01','1950-01-10'))[:,150,150].values)}" )
+        # print(f"   sum(bc_tdelta.sel(time=slice('1950-01-01','1950-01-10')).values):{sum(bc_tdelta.sel(time=slice('1950-01-01','1950-01-10'))[:,150,150].values)}" )
 
 
     # ______ Apply correction to (all) values ______
-    da_pcp *= correction[:len(da_pcp.time)] #subset to catch the possibility of the last year being not complete?
+    da_pcp *= correction[:len(da_pcp.time)] #subset to catch the possibility of the last year being not complete
 
     # except where the original daily value was 0, here we set to the scaled bc_daily value:
     da_pcp = da_pcp.where(~mask[:len(da_pcp.time)], bc_tdelta)
@@ -232,10 +229,7 @@ def correct_temperature( this_ds, dsObs_tmin, dsObs_tmax, dsRef_tmin, dsRef_tmax
     else:
         print("   - - - - - - - -  Bias-correcting temperature by year  - - - - - - - - -  ")
 
-    # tdelta_int = int(this_ds.time.dt.hour[1]-this_ds.time.dt.hour[0])
-    # if tdelta_int ==0:
-    #     tdelta_int=24
-    #     print("       tdelta_int=24; daily timestep")
+    # determine time step:
     tdelta_int = int(this_ds.time.dt.hour[1]-this_ds.time.dt.hour[0])
     if tdelta_int ==0:
         tdelta_int = int(this_ds.time.dt.hour[2]-this_ds.time.dt.hour[1])
@@ -253,16 +247,9 @@ def correct_temperature( this_ds, dsObs_tmin, dsObs_tmax, dsRef_tmin, dsRef_tmax
         if np.isnan(ta2m).any():
             print('ta2m has nans! ')
 
-        # if tdelta_int==24:
         print("   making daily tmin/tmax values from ta2m")
         tmin = ta2m.resample(time='1D').min(dim='time').load()
         tmax = ta2m.resample(time='1D').max(dim='time').load()
-        # # elif tdelta_int==3:
-        # else:
-        #     # print(f"   making {tdelta_int}h tmin/tmax values from ta2m")
-        #     print(f"   making daily tmin/tmax values from ta2m")
-        #     tmin = ta2m.resample(time='1D').min(dim='time').load()
-        #     tmax = ta2m.resample(time='1D').max(dim='time').load()
 
         if np.isnan(tmin).any():
             print('tmin has nans! ')

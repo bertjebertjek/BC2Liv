@@ -1,8 +1,8 @@
 #!/bin/bash
 #PBS -l select=1:ncpus=1:mem=20GB
-#PBS -l walltime=01:00:00
+#PBS -l walltime=04:00:00
 #PBS -A P48500028
-#PBS -q casper
+#PBS -q main
 #PBS -N rgr2Liv
 #PBS -J 0-55:1
 #PBS -o job_output/array.out
@@ -48,28 +48,38 @@ CMIP=CMIP6
 
 if [ "$CMIP" == "CMIP5" ] ; then
     # allMods=( CCSM4 CMCC-CM CNRM-CM5 CanESM2 GFDL-CM3 MIROC5 MRI-CGCM3 )# HadGEM2-ES
-    allMods=( CMCC-CM CNRM-CM5 GFDL-CM3 MRI-CGCM3 ) # CCSM4 CMCC-CM CNRM-CM5 CanESM2 GFDL-CM3 MIROC5
+    allMods=( CNRM-CM5 GFDL-CM3  MRI-CGCM3 )
     # allScens=( rcp85_2005_2050 rcp85_2050_2100 )
-    # allScens=( historical rcp45_2005_2050 rcp45_2050_2100 rcp85_2005_2050 rcp85_2050_2100  )
-    allScens=( rcp45_2050_2100 rcp85_2050_2100  )
+    allScens=( historical rcp45_2005_2050 rcp45_2050_2100 rcp85_2005_2050 rcp85_2050_2100  )
+    # allScens=( rcp45_2050_2100 rcp85_2050_2100  )
+    path_in=/glade/campaign/ral/hap/bert/${CMIP}/WUS_icar_nocp_full # CMIP5 !~!!!!
+    path_out=/glade/derecho/scratch/bkruyt/${CMIP}/WUS_icar_LivGrd2
+
 elif [ "$CMIP" == "CMIP6" ] ; then
-    # allMods=( CanESM5 )  NorESM2-MM
-    allMods=( CMCC-CM2-SR5)
+    # allMods=( CanESM5 )  # CMCC-CM2-SR5 MPI-M.MPI-ESM1-2-LR  NorESM2-MM
+    # allMods=( CMCC-CM2-SR5)
+    # allMods=( MIROC-ES2L )
     # allMods=(  MPI-M.MPI-ESM1-2-LR )
-    # allMods=(MIROC-ES2L )
-    # allScens=(  hist ssp245_2004 ssp245_2049 ssp370_2004 ssp370_2049 ssp585_2004 ssp585_2049 )
-    allScens=( ssp585_2049 ) # ssp370_2004 ssp585_2004)ssp245_2004 ssp585_2004 ssp585_2049
-    # allScens=( ssp245_2049 )
+    allMods=( NorESM2-MM )
+
+    allScens=(  hist ssp245_2004 ssp245_2049 ssp370_2004 ssp370_2049 ssp585_2004 ssp585_2049 )
+    # allScens=( ssp585_2049 ) # ssp370_2004 ssp585_2004)ssp245_2004 ssp585_2004 ssp585_2049
+    # allScens=( hist ssp370_2004 ssp370_2049 ssp585_2004 ssp585_2049 )
+
+    path_in=/glade/campaign/ral/hap/bert/${CMIP}/WUS_icar_nocp_full2 # CMIP6
+    path_out=/glade/derecho/scratch/bkruyt/${CMIP}/WUS_icar_LivGrd3 # lake mask ta2m
+
 fi
 
+# alldts=( daily )
 # alldts=( daily 3hr )
 alldts=( 3hr )
 
 #%%%%%%%    set paths    %%%%%%%%%%
 
 # path_in=/glade/campaign/ral/hap/bert/CMIP6/WUS_icar_nocp_full
-path_in=/glade/campaign/ral/hap/bert/${CMIP}/WUS_icar_nocp_full2
-path_out=/glade/derecho/scratch/bkruyt/${CMIP}/WUS_icar_LivGrd2
+# path_in=/glade/campaign/ral/hap/bert/${CMIP}/WUS_icar_nocp_full # CMIP5 !~!!!!
+# path_out=/glade/derecho/scratch/bkruyt/${CMIP}/WUS_icar_LivGrd2
 
 
 

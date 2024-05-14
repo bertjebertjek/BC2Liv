@@ -64,7 +64,20 @@ def process_command_line():
 
     return parser.parse_args()
 
+def crop_nan(ds, n):
+    """Set outer n grid cells to NaN"""
+    # Iterate over each variable in the dataset
+    for var_name in ds.variables:
+        if len(ds[var_name].dims)==3 and 'lat' in ds[var_name].dims and 'lon' in ds[var_name].dims:
+            print(var_name)
+            var = ds[var_name]
+            # Set outer n grid cells to NaN
+            var[:, :, :n] = np.nan  # Set leftmost columns to NaN
+            var[:, :, -n:] = np.nan  # Set rightmost columns to NaN
+            var[:, :n, :] = np.nan  # Set top rows to NaN
+            var[:, -n:, :] = np.nan  # Set bottom rows to NaN
 
+    return ds
 
 
 def get_livneh(icar_pcp):
@@ -129,13 +142,13 @@ if __name__ == '__main__':
     ICAR_onLiv_path = args.path_out
     CMIP            = args.CMIP
 
-    crop_size=3 ; crop=True  # exaggerate for test
+    crop_size=3 ; crop=True  # crop outer n cells with NaN
     mask = True
 
     print(f"\n###############################################################\n")
     print(f"Regridding {dt} data from {args.path_in} to {args.path_out} \n on the livneh grid, for model {model} {scen} \n")
     if crop: print(f"   - cropping ICAR domain by {crop_size} cells on all sides to mask boundary effects")
-    if mask: print(f"   - masking lakes \n")
+    if mask: print(f"   - masking lakes in ta2m \n")
     print(f"###############################################################\n")
 
     # create out dir if it does not exist
@@ -183,14 +196,14 @@ if __name__ == '__main__':
         print('\n  livneh_pr shape' , livneh_pr.shape)
 
         # - - - - -  define regridder  - - - - - - - -
-        if crop:
-            ICAR_grid_with_bounds = i2g.get_latlon_b(
-            dsICAR1[pcp_var].isel(time=0).isel(
-                lon_x=slice(crop_size,-crop_size)).isel(lat_y=slice(crop_size,-crop_size)),
-                lon_str='lon',  lat_str='lat',
-                lon_dim='lon_x', lat_dim='lat_y')
-        else:
-            ICAR_grid_with_bounds = i2g.get_latlon_b(
+        # if crop:
+        #     ICAR_grid_with_bounds = i2g.get_latlon_b(
+        #     dsICAR1[pcp_var].isel(time=0).isel(
+        #         lon_x=slice(crop_size,-crop_size)).isel(lat_y=slice(crop_size,-crop_size)),
+        #         lon_str='lon',  lat_str='lat',
+        #         lon_dim='lon_x', lat_dim='lat_y')
+        # else:
+        ICAR_grid_with_bounds = i2g.get_latlon_b(
                 dsICAR1[pcp_var].isel(time=0),
                 lon_str='lon',  lat_str='lat',
                 lon_dim='lon_x', lat_dim='lat_y')
@@ -241,14 +254,28 @@ if __name__ == '__main__':
             dsICAR = xr.open_mfdataset(files_m)
 
             # - - - - mask lakes  - - - -
+            """I would recommend a fill 1 grid cell in all directions first to minimize the distance you are filling from, then a fill W->E all the way across to fill in all the lakes.  Then when it is regridded, you will be regridding to a dataset (livneh) that doesn't have "lakes" in it to begin with other than great salt lake, so if people use the data, they are mosly thinking of it as "land" air temperatures anyway. But we should have a value at all the gridcells the Livneh dataset as a value."""
             if CMIP=="CMIP6" and mask:
                 geo = xr.open_dataset(geo_file)
                 msk = (geo.isel(Time=0).LANDMASK==1).values
-                dsICAR = dsICAR.where(msk)
+                # dsICAR = dsICAR.where(msk)
+                if 'lon_x' in dsICAR.dims: londim='lon_x'
+                if 'lon' in dsICAR.dims: londim='lon'
+                if 'lat_y' in dsICAR.dims: latdim='lat_y'
+                if 'lat' in dsICAR.dims: latdim='lat'
+                masked_ta2m = dsICAR['ta2m'].where(msk)
+                masked_ta2m = masked_ta2m.ffill(londim,limit=1).bfill(londim,limit=1).ffill(latdim,limit=1).bfill(latdim,limit=1).ffill(londim)
+                dsICAR['ta2m'] = masked_ta2m
+
             # - - - - - crop boundary  - - - - -
             if crop:
-                dsICAR = dsICAR.isel(lon_x=slice(crop_size,-crop_size)).isel(lat_y=slice(crop_size,-crop_size))
+                # dsICAR = dsICAR.isel(lon_x=slice(crop_size,-crop_size)).isel(lat_y=slice(crop_size,-crop_size))
+
+                # Set outer cells to NaN iso of cropping:
+                dsICAR = crop_nan(dsICAR, crop_size)
+
                 # print(f" After cropping {crop_size} cells: dsICAR['lon'].shape is ",dsICAR['lon'].shape )
+                print(f"   masking lakes in ta2m")
             dsICAR = dsICAR.load()
 
 
@@ -257,6 +284,13 @@ if __name__ == '__main__':
             t0 = time.time()
             icar_on_liv = regridder2(dsICAR)
             print("   ", time.time() - t0)
+
+            # -----  mask values outside livneh domain (like waterbodies) (in ta2m) -----
+            mask2= ~livneh_pr.isel(time=0).isnull()
+            icar_on_liv['ta2m'] = icar_on_liv['ta2m'].where(mask2)
+
+            # in all vars??
+            # this will be done in bias correction anyway??
 
             # -----  write variable attributes  ------------
             for var in icar_on_liv.data_vars:
@@ -313,10 +347,26 @@ if __name__ == '__main__':
         if CMIP=="CMIP6" and mask:
             geo = xr.open_dataset(geo_file)
             msk = (geo.isel(Time=0).LANDMASK==1).values
-            dsICAR = dsICAR.where(msk)
+            # dsICAR = dsICAR.where(msk)
+            if 'lon_x' in dsICAR.dims: londim='lon_x'
+            if 'lon' in dsICAR.dims: londim='lon'
+            if 'lat_y' in dsICAR.dims: latdim='lat_y'
+            if 'lat' in dsICAR.dims: latdim='lat'
+
+            masked_Tmin = dsICAR['Tmin'].where(msk)
+            masked_Tmin = masked_Tmin.ffill(londim,limit=1).bfill(londim,limit=1).ffill(latdim,limit=1).bfill(latdim,limit=1).ffill(londim)
+            dsICAR['Tmin'] = masked_Tmin
+
+            masked_Tmax = dsICAR['Tmax'].where(msk)
+            masked_Tmax = masked_Tmax.ffill(londim,limit=1).bfill(londim,limit=1).ffill(latdim,limit=1).bfill(latdim,limit=1).ffill(londim)
+            dsICAR['Tmax'] = masked_Tmax
+
+            print(f"   masking lakes in Tmin/Tmax")
+        # - - - - -   crop domain (set to nan)  - - - -
         if crop:
-                dsICAR = dsICAR.isel(lon_x=slice(crop_size,-crop_size)).isel(lat_y=slice(crop_size,-crop_size))
-                print(f" After cropping {crop_size} cells: dsICAR['lon'].shape is ",dsICAR['lon'].shape )
+            dsICAR = crop_nan(dsICAR, crop_size)
+            # dsICAR = dsICAR.isel(lon_x=slice(crop_size,-crop_size)).isel(lat_y=slice(crop_size,-crop_size))
+            # print(f" After cropping {crop_size} cells: dsICAR['lon'].shape is ",dsICAR['lon'].shape )
         dsICAR = dsICAR.load()
 
 
@@ -352,6 +402,11 @@ if __name__ == '__main__':
         t0 = time.time()
         icar_on_liv = regridder2(dsICAR)
         print("   ", time.time() - t0)
+
+        # -----  mask values outside livneh domain (like waterbodies) (in ta2m) -----
+        mask2= ~livneh_pr.isel(time=0).isnull()
+        icar_on_liv['Tmin'] = icar_on_liv['Tmin'].where(mask2)
+        icar_on_liv['Tmax'] = icar_on_liv['Tmax'].where(mask2)
 
         # -------  save (as monthly file) -------
         if not os.path.exists(f"{ICAR_onLiv_path}/{model}_{scenario}/{dt}"):

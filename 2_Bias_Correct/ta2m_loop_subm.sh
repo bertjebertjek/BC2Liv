@@ -1,17 +1,25 @@
 #!/bin/bash
 
-
 ##############################################################################
 #
 # This is a loop_submit.sh for ta2m bc only
-# Its function is to launch ta2m jobs, the first dependent on the 2nd, that
-# Bias correct ICAR output to the Livneh grid.
+#   Its function is to launch Temperature Bias correction jobs that
+#   Bias correct ICAR output to the Livneh grid.
 # See ../README_BC2Liv.md for more info.
+#
+#
+# N.B. Set paths in BC_Icar2Liv_5y_ta2m.py  !!!
+#
 #
 # Bert Kruyt, NCAR RAL feb 2024
 ##############################################################################
 
 CMIP=CMIP6
+
+# # # # # #    Setings     # # # # # #
+dt=3hr
+# dt=daily
+part=2  # part 1 = from start; part 2 = look for last output file and restart there : 3=custom (in case we need to rerun sth.)
 
 
 if [ "$CMIP" == "CMIP5" ] ; then
@@ -20,23 +28,20 @@ if [ "$CMIP" == "CMIP5" ] ; then
     # allScens=( historical rcp45 rcp85 )
     allScens=( rcp45 )
 elif [ "$CMIP" == "CMIP6" ] ; then
-    # allMods=( NorESM2-MM ) # CanESM5
-    allMods=( MIROC-ES2L ) #MPI-M.MPI-ESM1-2-LR )CMCC-CM2-SR5
-    allScens=( hist )  # ssp245 ssp370 ) # ssp585  )
+    # allMods=( CanESM5 CMCC-CM2-SR5 MIROC-ES2L NorESM2-MM ) #
+    allMods=( MPI-M.MPI-ESM1-2-LR ) # ) #
+    # allScens=(  ssp245  ssp370 ssp585  )
+    allScens=( hist )
 fi
 echo "########################################################## "
 echo " Submitting ta2m bias correction to Livneh grid for: "
 echo "   ${allMods[*]}"
 echo "   ${allScens[*]}"
+echo "   part = ${part}"
 echo "  "
 echo "########################################################## "
 echo "  "
 
-
-# # # # # #    Setings     # # # # # #
-dt=3hr
-# dt=daily
-part=2  # part 1 = from start; part 2 = look for last output file and restart there : 3=custom (in case we need to rerun sth.)
 
 for model in ${allMods[@]} ; do
     for scen in ${allScens[@]} ; do
@@ -50,7 +55,7 @@ for model in ${allMods[@]} ; do
     cat <<EOS | qsub -
     #!/bin/bash
 
-    #PBS -l select=1:ncpus=1:mem=150GB
+    #PBS -l select=1:ncpus=1:mem=350GB
     #PBS -l walltime=12:00:00
     #PBS -A P48500028
     #PBS -q casper
