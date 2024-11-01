@@ -1,12 +1,14 @@
 #!/bin/bash
-#PBS -l select=1:ncpus=1:mem=20GB
-#PBS -l walltime=04:00:00
+#PBS -l select=1:ncpus=1:mem=60GB
+#PBS -l walltime=02:00:00
 #PBS -A P48500028
-#PBS -q main
-#PBS -N rgr2Liv
-#PBS -J 0-55:1
+#PBS -q casper
+#PBS -N rgr2LivD
+#PBS -J 15-16:20
 #PBS -o job_output/array.out
 #PBS -j oe
+#PBS -r y
+#PBS -m n
 
 ########################################################################
 #
@@ -43,37 +45,41 @@ conda activate npl
 
 # ____________   Set arguments: (year = PBS_array_index) -_______________
 
+# alldts=( daily )
+alldts=( 3hr )
+# alldts=( daily 3hr )
 
 CMIP=CMIP6
 
 if [ "$CMIP" == "CMIP5" ] ; then
-    # allMods=( CCSM4 CMCC-CM CNRM-CM5 CanESM2 GFDL-CM3 MIROC5 MRI-CGCM3 )# HadGEM2-ES
-    allMods=( CNRM-CM5 GFDL-CM3  MRI-CGCM3 )
-    # allScens=( rcp85_2005_2050 rcp85_2050_2100 )
+    allMods=( MIROC5 MRI-CGCM3 CanESM2 CCSM4 CMCC-CM CNRM-CM5   ) #  HadGEM2-ES  GFDL-CM3
     allScens=( historical rcp45_2005_2050 rcp45_2050_2100 rcp85_2005_2050 rcp85_2050_2100  )
-    # allScens=( rcp45_2050_2100 rcp85_2050_2100  )
-    path_in=/glade/campaign/ral/hap/bert/${CMIP}/WUS_icar_nocp_full # CMIP5 !~!!!!
-    path_out=/glade/derecho/scratch/bkruyt/${CMIP}/WUS_icar_LivGrd2
+
+    allMods=( MIROC5 )
+    allScens=(  historical  ) # rcp85_2005_2050 ) #
+
+    # path_in=/glade/campaign/ral/hap/bert/${CMIP}/WUS_icar_nocp_full # CMIP5 !~!!!!
+    # path_out=/glade/derecho/scratch/bkruyt/${CMIP}/WUS_icar_LivGrd3 # lake mask ta2m
+    path_in=/glade/campaign/ral/hap/bert/${CMIP}/WUS_icar_nocp_full4 # correct cp subtracted
+    path_out=/glade/derecho/scratch/bkruyt/${CMIP}/WUS_icar_LivGrd4
 
 elif [ "$CMIP" == "CMIP6" ] ; then
     # allMods=( CanESM5 )  # CMCC-CM2-SR5 MPI-M.MPI-ESM1-2-LR  NorESM2-MM
-    # allMods=( CMCC-CM2-SR5)
+    # allMods=( CMCC-CM2-SR5 MIROC-ES2L MPI-M.MPI-ESM1-2-LR )
     # allMods=( MIROC-ES2L )
-    # allMods=(  MPI-M.MPI-ESM1-2-LR )
-    allMods=( NorESM2-MM )
+    allMods=(  MPI-M.MPI-ESM1-2-LR )
+    # allMods=( NorESM2-MM )
 
-    allScens=(  hist ssp245_2004 ssp245_2049 ssp370_2004 ssp370_2049 ssp585_2004 ssp585_2049 )
-    # allScens=( ssp585_2049 ) # ssp370_2004 ssp585_2004)ssp245_2004 ssp585_2004 ssp585_2049
-    # allScens=( hist ssp370_2004 ssp370_2049 ssp585_2004 ssp585_2049 )
+    # allScens=(  hist ssp245_2004 ssp245_2049 ssp370_2004 ssp370_2049 ssp585_2004 ssp585_2049 )
+    # allScens=( ssp245_2004 ) # ssp370_2004 ssp585_2004)ssp245_2004 ssp585_2004 ssp585_2049
+    # allScens=( hist ) # ssp370_2004 ssp370_2049 ssp585_2004
+    allScens=( ssp585_2049 )
 
-    path_in=/glade/campaign/ral/hap/bert/${CMIP}/WUS_icar_nocp_full2 # CMIP6
+    path_in=/glade/campaign/ral/hap/bert/${CMIP}/WUS_icar_nocp_full # CMIP6
     path_out=/glade/derecho/scratch/bkruyt/${CMIP}/WUS_icar_LivGrd3 # lake mask ta2m
 
 fi
 
-# alldts=( daily )
-# alldts=( daily 3hr )
-alldts=( 3hr )
 
 #%%%%%%%    set paths    %%%%%%%%%%
 

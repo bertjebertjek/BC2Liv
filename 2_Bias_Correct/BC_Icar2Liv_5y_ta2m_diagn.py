@@ -273,14 +273,18 @@ if __name__ == '__main__':
     if CMIP=="CMIP6":
         # base_in  = f"/glade/campaign/ral/hap/bert/{CMIP}/WUS_icar_livBC3" # PCP in! # ta2m mased correctlt
         ref_in   = f"/glade/derecho/scratch/bkruyt/{CMIP}/WUS_icar_LivGrd3"  # referenece files
-        path_out = f"/glade/campaign/ral/hap/bert/{CMIP}/WUS_icar_livBC3"
-        # path_out = f"/glade/campaign/ral/hap/bert/{CMIP}/WUS_icar_livBC4" # test for ta2m anomaly
+        # path_out = f"/glade/campaign/ral/hap/bert/{CMIP}/WUS_icar_livBC3"
+        path_out = f"/glade/campaign/ral/hap/bert/{CMIP}/WUS_icar_livBC4" # test for ta2m anomaly
         base_in  = path_out
     elif CMIP=="CMIP5":
         base_in = f"/glade/campaign/ral/hap/bert/{CMIP}/WUS_icar_livBC4" # BC PCP as input
         ref_in  = f"/glade/derecho/scratch/bkruyt/{CMIP}/WUS_icar_LivGrd4"
         path_out = f"/glade/campaign/ral/hap/bert/{CMIP}/WUS_icar_livBC4"  # 4: Correct GCM cp removed in postproccessing.
 
+    #############################################
+    sngl_loc=True
+    a=252; b=314  # test one location
+    #############################################
 
     # create out dir if it does not exist
     if dropvars and not os.path.exists(f"{path_out}/{model}_{scen}/{dt}"):
@@ -343,18 +347,12 @@ if __name__ == '__main__':
             print(f"   last block did not run to completion, (re)starting at {time_s[ts]}")
 
     elif int(args.part)==3:  # custom
-        # time_s=['2025-01-01', '2030-01-01','2035-01-01', '2040-01-01']
-        # time_f=['2029-12-31', '2034-12-31','2039-12-31', '2044-12-31']
+        time_s=['2025-01-01', '2030-01-01','2035-01-01', '2040-01-01']
+        time_f=['2029-12-31', '2034-12-31','2039-12-31', '2044-12-31']
         # time_s=['2085-01-01']
         # time_f=['2089-12-31']
         time_s=['2065-01-01']
         time_f=['2069-12-31']
-        # time_s=['1950-01-01','1970-01-01']
-        # time_f=['1954-12-31', '1974-12-31' ]
-        # time_s=['2005-01-01', '2010-01-01', '2055-01-01']
-        # time_f=['2009-12-31', '2014-12-31', '2059-12-31']
-        # time_s=['2070-01-01']
-        # time_f=['2074-12-31']
         ts=0
 
 
@@ -378,10 +376,6 @@ if __name__ == '__main__':
         files_ref = get_icar_ref_filelist(ref_start.split('-')[0], ref_end.split('-')[0], dt="3hr")
         print(f"   found {len(files_ref)} 3hr ref files")
 
-    # if CMIP=="CMIP6":
-    #     files_ref = get_icar_ref_filelist(ref_start.split('-')[0], ref_end.split('-')[0], dt="3hr")
-    # elif CMIP=="CMIP5":
-    #     files_ref = get_icar_filelist_CMIP5(ref_start.split('-')[0], ref_end.split('-')[0], dt="yearly")
     print(f"   loading {len(files_ref)} icar files: {files_ref[0].split('/')[-1]} to {files_ref[-1].split('/')[-1]} ")
 
     try:
@@ -389,6 +383,7 @@ if __name__ == '__main__':
     except:
         dsRef_full = xr.open_mfdataset( files_ref, combine='nested', compat='override')
         print(f"\n   !!! Warning: issues combining ref data were circumvented by using compat='override' !!! \n")
+
 
     print(f"   Ref full time: {dsRef_full.time.values.min()} to {dsRef_full.time.max().values} ")
 
@@ -398,18 +393,30 @@ if __name__ == '__main__':
         dsTmax_ref = dsRef_full.Tmax.load()
     else:
         print("   making daily tmin/tmax values from 3hr ta2m Reference data")
-        dsTmin_ref = dsRef_full.ta2m.resample(time='1D').min(dim='time').load()
-        dsTmax_ref = dsRef_full.ta2m.resample(time='1D').max(dim='time').load()
+        if sngl_loc:
+            dsTmin_ref = dsRef_full.ta2m[:,a-2:a+2, b-2:b+2].resample(time='1D').min(dim='time').load()
+            dsTmax_ref = dsRef_full.ta2m[:,a-2:a+2, b-2:b+2].resample(time='1D').max(dim='time').load()
+        else:
+            dsTmin_ref = dsRef_full.ta2m.resample(time='1D').min(dim='time').load()
+            dsTmax_ref = dsRef_full.ta2m.resample(time='1D').max(dim='time').load()
 
 
     # - - - - - C. Define data to match:  (Livneh) - - - - -
     icar_1_for_grid = xr.open_mfdataset( files_ref[0])  # one ICAR file to crop livneh with
     livneh_tmin, livneh_tmax = get_livneh_T(icar_1file=icar_1_for_grid.isel(time=0))
 
+    #########################################
+    if sngl_loc:
+        livneh_tmin=livneh_tmin[:,a-2:a+2, b-2:b+2]
+        livneh_tmax=livneh_tmax[:,a-2:a+2, b-2:b+2]
+    #########################################
+
     #load the var to correct;
     livneh_tmin = livneh_tmin.load()
     livneh_tmax = livneh_tmax.load()
 
+    # print(f"   min Tmin ref: {np.nanmin(dsTmin_ref.isel(lon=slice(None, -104)).values)}")
+    # print(f"   min liv tmin: {np.nanmin(livneh_tmin)}")
 
     #################   Loop through the 5y periods:    ###############
 
@@ -423,17 +430,14 @@ if __name__ == '__main__':
         files_in =  get_icar_PCP_filelist(time_s[t].split('-')[0], time_f[t].split('-')[0], dt=dt)
         dsI_in   =  xr.open_mfdataset( files_in ) # loaded into memory in bc_func
 
+
         # # subset reference data, (leave out 5years)
         dsTmin_ref_ex5y= get_dsRef_ex5y(dsTmin_ref,  fiveY_s=time_s[t], fiveY_e=time_f[t], ref_start=ref_start, ref_end=ref_end )
         dsTmax_ref_ex5y= get_dsRef_ex5y(dsTmax_ref,  fiveY_s=time_s[t], fiveY_e=time_f[t], ref_start=ref_start, ref_end=ref_end )
         print(f"   Ref time: {dsTmin_ref_ex5y.time.values.min()} to {dsTmin_ref_ex5y.time.max().values} ")
 
-        # print(f"   min liv tmin: {np.nanmin(livneh_tmin)}")
         # print(f"   min Tmin ref ex5y: {np.nanmin(dsTmin_ref_ex5y.isel(lon=slice(None, -104)).values)}")
-        # try:
-        #     print(f"   min ta2m in: {np.nanmin(dsI_in.ta2m.isel(lon=slice(None, -104)).values)}")
-        # except:
-        #     print(f"   min ta2m in: {np.nanmin(dsI_in.Tmin.isel(lon=slice(None, -104)).values)}")
+        # print(f"   min ta2m in: {np.nanmin(dsI_in.ta2m.isel(lon=slice(None, -104)).values)}")
 
         # --------  the bias correction functions    ---------
         T_corrected_ds = correct_temperature( this_ds     = dsI_in #pcp_corrected_ds

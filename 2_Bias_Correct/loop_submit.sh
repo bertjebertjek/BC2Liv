@@ -4,9 +4,15 @@
 #########################               Settings            #############################
 #########################################################################################
 
-CMIP=CMIP6
-part=1    # part 1 = from start; part 2 = look for last output file and restart there : 3=custom (in case we need to rerun sth.)
 
+CMIP=CMIP6
+part=1  # part 1 = from start; part 2 = look for last output file and restart there : 3=custom (in case we need to rerun sth.)
+dt=3hr #
+# dt=daily
+
+# CMIP=CMIP5
+# part=1   # part 1 = from start; part 2 = look for last output file and restart there : 3=custom (in case we need to rerun sth.)
+# dt=3hr
 #________________________________________________________________________
 # N.B. Set paths in BC_Icar2Liv_5y_pcp.py AND BC_Icar2Liv_5y_ta2m.py  !!!
 #________________________________________________________________________
@@ -15,22 +21,22 @@ part=1    # part 1 = from start; part 2 = look for last output file and restart 
 #-----------------    CMIP5    ------------------------
 if [ "$CMIP" == "CMIP5" ] ; then
     # allMods=( CanESM2 CCSM4 CMCC-CM CNRM-CM5  GFDL-CM3 MIROC5 MRI-CGCM3 )# HadGEM2-ES
-    # allMods=( MIROC5) # CCSM4 CMCC-CM CNRM-CM5 CanESM2 GFDL-CM3 MIROC5
-    # allScens=( rcp45 )
-    allMods=( CanESM2 CCSM4 CMCC-CM CNRM-CM5 )
-    # allScens=( historical ) # rcp85 )
-    allScens=( historical rcp45 rcp85 )
-    # allScens=( historical rcp45 ) # rcp85 )  #
+    # allMods=( CanESM2 CCSM4 CMCC-CM CNRM-CM5  MIROC5 MRI-CGCM3 ) #  GFDL-CM3
+    allMods=( MIROC5 ) # CNRM-CM5 GFDL-CM3 MIROC5 MRI-CGCM3 )
+
+    allScens=( historical ) # rcp85
+    # allScens=( historical rcp45  )
+
 #-----------------    CMIP6    ------------------------
 elif [ "$CMIP" == "CMIP6" ] ; then
-    # allMods=( CanESM5 CMCC-CM2-SR5  )
+    # allMods=( CanESM5  )
     # allMods=( MIROC-ES2L )
     # allMods=( CMCC-CM2-SR5 )
-    allMods=( MPI-M.MPI-ESM1-2-LR  )
+    allMods=( MPI-M.MPI-ESM1-2-LR ) #MIROC-ES2L  CMCC-CM2-SR5 )
     # allMods=( NorESM2-MM  )
     # allMods=( MIROC-ES2L  CMCC-CM2-SR5  )
     # allScens=( ssp370 ssp245 ssp585 hist ) #
-    allScens=( hist )
+    allScens=( ssp585 )
 fi
 
 #########################################################################################
@@ -62,6 +68,7 @@ for model in ${allMods[@]} ; do
 
 
     # ___ modify model, scen , CMIP ___
+    sed -i "s/__DT__/$dt/g" auto_submit/${model}_${scen}_submit_BC2liv.sh
     sed -i "s/__MODEL__/$model/g" auto_submit/${model}_${scen}_submit_BC2liv.sh
     sed -i "s/__SCEN__/$scen/g" auto_submit/${model}_${scen}_submit_BC2liv.sh
     sed -i "s/__CMIP__/$CMIP/g" auto_submit/${model}_${scen}_submit_BC2liv.sh

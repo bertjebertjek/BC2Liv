@@ -1,11 +1,12 @@
 #!/bin/bash
-#PBS -l select=1:ncpus=1:mem=350GB
+#PBS -l select=1:ncpus=1:mem=150GB
 #PBS -l walltime=12:00:00
 #PBS -A P48500028
 #PBS -q casper
 #PBS -N p___JOBNAME__
-#PBS -o job_output/BC2LIV_CMIP_TA2M.out
+#PBS -o job_output/BC2LIV_CMIP_PCP.out
 #PBS -j oe
+#PBS -m n
 
 ##############################################################################
 #
@@ -26,10 +27,9 @@ conda activate /glade/work/yifanc/anaconda3/envs/py3
 # conda activate py311
 
 # # # # # #    Setings     # # # # # #
-dt=3hr
-# dt=daily
 
 # _______ SET BY BASH script ______
+dt=__DT__
 model=__MODEL__
 scen=__SCEN__
 CMIP=__CMIP__
@@ -43,13 +43,14 @@ part=__part__  # part 1 = from start; part 2 = look for last output file and res
 cat <<EOS | qsub -W depend=afterany:${PBS_JOBID}
     #!/bin/bash
 
-    #PBS -l select=1:ncpus=1:mem=350GB
+    #PBS -l select=1:ncpus=1:mem=150GB
     #PBS -l walltime=12:00:00
     #PBS -A P48500028
     #PBS -q casper
     #PBS -N t___JOBNAME__
     #PBS -o job_output/BC2LIV_CMIP_TA2M.out
     #PBS -j oe
+    #PBS -m n
 
 
     module load conda
@@ -59,9 +60,9 @@ cat <<EOS | qsub -W depend=afterany:${PBS_JOBID}
     mkdir -p job_auto_${CMIP}_ta2m_${dt}
     python -u BC_Icar2Liv_5y_ta2m.py $model $scen $part $dt $CMIP >& job_auto_${CMIP}_ta2m_${dt}/${model}_${scen}_${dt}
 
-    # # #    clean up the generated job scripts   # # #
-    wait 10
-    rm auto_submit/${model}_${scen}_submit_BC2liv.sh
+    # # # #    clean up the generated job scripts   # # #
+    # wait 10
+    # rm auto_submit/${model}_${scen}_submit_BC2liv.sh
 
 
 EOS

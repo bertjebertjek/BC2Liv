@@ -143,6 +143,10 @@ def correct_precip(this_ds, dsObs, dsRef,  bc_by_month=False, noise=True, verbos
     print("   quantile mapping")
 
     # NB: (very small) negative values are introduced by the bc procedure when setting extrapolate='1to1'. (This does not happen when dsRef=None. ). To prevent this we set extrapolate to max. (2024-04-18)
+    if verbose:
+        print(f"   daily_n shape: {daily_n.shape}")
+        print(f"   dsRef_n shape: {dsRef_n.shape}")
+        print(f"   dsObs shape:   {dsObs.shape}")
     if bc_by_month:
         bc_daily = quantile_mapping.quantile_mapping_by_group(
             # def quantile_mapping_by_group(input_data, ref_data, data_to_match, (ref should exclude 5y input)
@@ -274,41 +278,42 @@ def correct_temperature( this_ds, dsObs_tmin, dsObs_tmax, dsRef_tmin, dsRef_tmax
     dsRef_tmax = dsRef_tmax#.load()
     dsObs_tmin = dsObs_tmin#.load() # should already be loaded
     dsObs_tmax = dsObs_tmax#.load()
-
+    # if verbose:
+    print(f"   min dsRef_tmin: {np.nanmin(dsRef_tmin.values)} ")
+    print(f"   min dsObs_tmin: {np.nanmin(dsObs_tmin.values)} ")
+    print(f"   min tmin before bc: {np.nanmin(tmin.values)} ")
 
     print("      ", np.round(time.time() - t0, 2))
 
+    # - - - -  QMAP  - - - -
     t0 = time.time()
     if bc_by_month: ## NB def quantile_mapping_by_group(input_data, ref_data, data_to_match, grouper='time.month', **kwargs):
         print("   quantile mapping t_min")
         bc_tmin = quantile_mapping.quantile_mapping_by_group(
             # tmin, icar_tmin, ltmin_on_icar,  extrapolate="1to1", grouper='time.month' , n_endpoints=50
-             tmin, dsRef_tmin, dsObs_tmin,  extrapolate="1to1", grouper='time.month' , n_endpoints=50
+             tmin, dsRef_tmin, dsObs_tmin, detrend=False, extrapolate="1to1", grouper='time.month' , n_endpoints=50
             )
-        del dsRef_tmin, dsObs_tmin
+        del dsObs_tmin ,dsRef_tmin
 
         print("   quantile mapping t_max")
         bc_tmax = quantile_mapping.quantile_mapping_by_group(
-            tmax, dsRef_tmax, dsObs_tmax,  extrapolate="1to1", grouper='time.month' , n_endpoints=50
+            tmax, dsRef_tmax, dsObs_tmax,   detrend=False, extrapolate="1to1", grouper='time.month' , n_endpoints=50
             )
-        del dsRef_tmax, dsObs_tmax
+        del dsObs_tmax #,dsRef_tmax
     else:
         print("   quantile mapping t_min")
         bc_tmin = quantile_mapping.quantile_mapping(
-            tmin, dsRef_tmin, dsObs_tmin,  extrapolate="1to1" , n_endpoints=50
+            tmin, dsRef_tmin, dsObs_tmin,   detrend=False, extrapolate="1to1" , n_endpoints=50
             )
-        del dsRef_tmin, dsObs_tmin
+        del dsObs_tmin ,dsRef_tmin
 
         print("   quantile mapping t_max")
         bc_tmax = quantile_mapping.quantile_mapping(
-             tmax, dsRef_tmax, dsObs_tmax,  extrapolate="1to1" , n_endpoints=50
+             tmax, dsRef_tmax, dsObs_tmax,  detrend=False, extrapolate="1to1" , n_endpoints=50
             )
-        del dsRef_tmax, dsObs_tmax
+        del  dsObs_tmax #,dsRef_tmax
 
     print("   ", np.round(time.time() - t0, 2))
-
-    # cleanup
-    gc.collect()
 
     if np.isnan(bc_tmin).any():
         print('bc_tmin has nans! ')
@@ -316,11 +321,44 @@ def correct_temperature( this_ds, dsObs_tmin, dsObs_tmax, dsRef_tmin, dsRef_tmax
         print('bc_tmax has nans! ')
 
 
+    # make mask to crop ta2m with after bc:
+    try:
+        Tmask= dsRef_tmax.isel(time=1).values>0
+    except:
+        try:
+            Tmask= dsRef_tmax.isel(time=1).ta2m.values>0
+        except:
+            Tmask= dsRef_tmax.isel(time=1).Tmax.values>0
+
+    # apply Tmask to mask t values outside of domain:
+    try:
+        bc_tmin.values =     bc_tmin.where( Tmask.__xarray_dataarray_variable__.values )
+        bc_tmax.values =     bc_tmax.where( Tmask.__xarray_dataarray_variable__.values )
+        print(f"   masking Tmin/max values outside of domain...\n")
+    except:
+        try:
+            bc_tmin.values =     bc_tmin.where( Tmask )
+            bc_tmax.values =     bc_tmax.where( Tmask )
+            print(f"   masking Tmin/max values outside of domain...\n")
+        except:
+            print(f"   could not mask Tmin/max values outside of domain ! ! !\n")
+
+    # --------- check for extremely low temps -----
+
+    print(f"   min input ta2m: {np.nanmin(ta2m.values )}  (K)")
+    print(f"   min daily bc tmin: {np.nanmin(bc_tmin.values )} (C)")
+    print(f"   max daily bc tmax: {np.nanmax(bc_tmax.values )} (C)")
+
+
+    # - - - - - apply correction to n-hr data  - - - -
     t0 = time.time()
     print("   applying correction to "+str(tdelta_int)+"-hourly data")
     if 'ta2m' in this_ds.data_vars:
         for i in range(len(this_ds.time)):
             t = int(i/(24/tdelta_int))
+
+            #### NOTE: if there are missing timesteps this goes terribly wrong! ####
+            # print(ta2m[i].time.values , tmin[t].time.values)
 
             dtr = (tmax[t] - tmin[t]).values
             dtr[dtr<0.001] = 0.001
@@ -328,6 +366,24 @@ def correct_temperature( this_ds, dsObs_tmin, dsObs_tmax, dsRef_tmin, dsRef_tmax
             this_ds["ta2m"][i] /= dtr
             this_ds["ta2m"][i] *= np.abs(bc_tmax[t] - bc_tmin[t])
             this_ds["ta2m"][i] += bc_tmin[t]+273.15
+
+            # try:
+            #     if (bc_tmin[t].values>bc_tmax[t].values).any(): print(f"   bc_tmin[t]>bc_tmax[t] @ t={t}")
+            # except:
+            #     print(" i cannot code")
+            # ta2m[i] -= tmin[t]
+            # if np.nanmin( ta2m[i].values )<0: print(f"   1. min ta2m: {np.nanmin( ta2m[i].values )}")
+            # # if ta2m[i].any()<0 :
+            # #     print(f"   ta2m[i] -= tmin[t]: {ta2m[i]}")
+            # ta2m[i] /= dtr
+            # if np.nanmin( ta2m[i].values )<0: print(f"   2. min ta2m: {np.nanmin( ta2m[i].values )}")
+            # # if ta2m[i].any()<0 : print(f"   ta2m[i] /= dtr: {ta2m[i] }")
+            # ta2m[i] *= np.abs(bc_tmax[t] - bc_tmin[t])
+            # if np.nanmin( ta2m[i].values )<0: print(f"   3. min ta2m: {np.nanmin( ta2m[i].values )}")
+            # # if ta2m[i].any()<0 : print(f"   ta2m[i] *= np.abs(bc_tmax[t] - bc_tmin[t]): {ta2m[i] }")
+            # ta2m[i] += bc_tmin[t]+273.15
+            # if np.nanmin( ta2m[i].values )<0: print(f"   4. min ta2m: {np.nanmin( ta2m[i].values )}")
+            # # if ta2m[i].any()<0 : print(f"   ta2m[i] += bc_tmin[t]+273.15: {ta2m[i] }")
     elif 'Tmin' in this_ds.data_vars:
         if tdelta_int==24:
             print('   Tmin min before:', np.nanmin(this_ds['Tmin'].values))
@@ -344,7 +400,12 @@ def correct_temperature( this_ds, dsObs_tmin, dsObs_tmax, dsRef_tmin, dsRef_tmax
             #     this_ds['Tmin'].values[i] *= bc_tmin[t]/this_ds['Tmin'].values[i]
             #     this_ds['Tmax'].values[i] *= bc_tmax[t]/this_ds['Tmax'].values[i]
 
+    print(f"   min output ta2m: {np.nanmin( ta2m.values )}")
+
+    # cleanup
+    gc.collect()
 
     print("   ", np.round(time.time() - t0, 2))
 
     return this_ds
+    # return ta2m

@@ -4,6 +4,8 @@
 #
 # Regrid ICAR to the Livneh grid
 #  - make sure GCM cp is removed first(!)
+#  - lakes masked and filled in for ta2m /Tmin /Tmax
+#  - 2024-05-17 Relhum is added (calculated) before regridding, iso after bc.
 #
 #
 # Authors:  Bert Kruyt, NCAR RAL 2023
@@ -31,16 +33,7 @@ import icar2gmet as i2g
 
 
 #--------------  SETTTINGS  ---------------
-# # # # # ICAR daily precip:
-# ICAR_day_path = '/glade/campaign/ral/hap/bert/CMIP6/WUS_icar_3h_pcpfix'
-
-# # # # ICAR daily;  precip w/o convective (output):
-# ICAR_nocp_path = '/glade/campaign/ral/hap/bert/CMIP6/WUS_icar_nocp_full' # CMIP6
-# ICAR_nocp_path = "/glade/campaign/ral/hap/currierw/icar/output" # CMIP5, includes GCM cp!!
-
-#### OUTPUT: (now argument in .sh script) ####
-# ICAR_onLiv_path =  '/glade/scratch/bkruyt/CMIP6/WUS_icar_LivGrd'
-# ICAR_onLiv_path =  '/glade/scratch/bkruyt/CMIP5/WUS_icar_LivGrd_incGCMcp'
+calc_relhum = True  # add relative humidity to dataset before regridding
 
 # geo_em file for masking lakes:
 geo_file='/glade/work/bkruyt/WPS/ICAR_domains/CMIP_WUS/geo_em.d01.nc'
@@ -80,6 +73,55 @@ def crop_nan(ds, n):
     return ds
 
 
+def relative_humidity(t,qv,p):
+        # ! convert specific humidity to mixing ratio
+        mr = qv / (1-qv)
+        # ! convert mixing ratio to vapor pressure
+        e = mr * p / (0.62197+mr)
+        # ! convert temperature to saturated vapor pressure
+        es = 611.2 * np.exp(17.67 * (t - 273.15) / (t - 29.65))
+        # ! finally return relative humidity
+        relative_humidity = e / es
+
+        # ! because it is an approximation things could go awry and rh outside or reasonable bounds could break something else.
+        # ! alternatively air could be supersaturated (esp. on boundary cells) but cloud fraction calculations will break.
+        # relative_humidity = min(1.0, max(0.0, relative_humidity))
+
+        return relative_humidity
+
+
+def add_relhum_to_ds(ds):
+    """ calculate relative humidity at 2m from ta2m, psfc and hus2m. """
+
+    #_______ calculate relative humidity at 2m: ________
+    if dt == "3hr" and 'ta2m' in ds.data_vars :
+        print("    calculating relative humidity" )
+        # if static_P==True:
+        #     # make a np array for the length of the input data with (static) pressure:
+        #     P = np.repeat(dsP.psfc.values[np.newaxis, 12, :, :], len(ds.time), axis=0)
+        # else: # if the data has surface pressure available:
+        try:
+            ds.psfc
+        except AttributeError:
+            print("no psfc in source dataset!")
+        else:
+            P = ds.psfc.values
+
+        # calculate relative humidity:
+        relhum = ds.hus2m.copy()
+        relhum.values = relative_humidity(t=ds.ta2m.values, qv=ds.hus2m.values, p= P )
+        # replace values over 1:
+        relhum.values[relhum.values>1]=1.0
+        # replace negative values
+        relhum.values[relhum.values<0.0]=0.0
+        ## if it is a dataArray we can add it like this:
+        ds = ds.assign(relhum2m=relhum)
+        ds.relhum2m.attrs['standard_name'] = "relative_humidity_2m"
+        ds.relhum2m.attrs['units'] = "-"
+
+    return ds
+
+
 def get_livneh(icar_pcp):
     """get livneh data, cropped to the icar grid (defined by icar_pcp)"""
 
@@ -107,12 +149,7 @@ def get_livneh(icar_pcp):
     livneh = livneh.sel(**{LatIndexer: slice(min_lat, max_lat ),
                             LonIndexer: slice(min_lon, max_lon)})
 
-    # livneht = livneht.sel(**{LatIndexer: slice(min_lat, max_lat ),
-    #                         LonIndexer: slice(min_lon, max_lon)})
-
     livneh_pr   = livneh["PRCP"]#.load()
-    # livneh_tmin = livneht["Tmin"]#.load()
-    # livneh_tmax = livneht["Tmax"]#.load()
 
     # clean up some data; correct time dimension:
     if 'Time' in livneh_pr.dims:
@@ -176,7 +213,7 @@ if __name__ == '__main__':
     if dt=="3hr": # monthly or daily files, so 12 or ~ 365 per year
 
         print( f"opening {ICAR_nocp_path}/{model}_{scenario}/{dt}/{file_prefix}_{model}_{scen}_{year}*.nc")
-        files = glob.glob(f"{ICAR_nocp_path}/{model}_{scenario}/{dt}/{file_prefix}_{model}_{scen}_{year}*.nc")  #  generic
+        files = sorted(glob.glob(f"{ICAR_nocp_path}/{model}_{scenario}/{dt}/{file_prefix}_{model}_{scen}_{year}*"))  #  generic
 
         # - - - - - C. Define data to match:  (Livneh) - - - - -
         dsICAR1=xr.open_dataset(files[0]).load() # load 1 ICAR file for the regridder
@@ -189,9 +226,10 @@ if __name__ == '__main__':
             print(" ERROR: Precipitation variable name unclear!  Stopping")
             sys.exit()
 
-        print(f" files[0]: {files[0]}")
-        print('\n  dsICAR1 shape' , dsICAR1[pcp_var].shape)
-        print( dsICAR1.isel(time=0) )
+        # print(f" files[0]: {files[0]}")
+        # print('\n  dsICAR1 shape' , dsICAR1[pcp_var].shape)
+        # print( dsICAR1.isel(time=0) )
+
         livneh_pr = get_livneh(icar_pcp=dsICAR1.isel(time=0)).load()
         print('\n  livneh_pr shape' , livneh_pr.shape)
 
@@ -252,6 +290,10 @@ if __name__ == '__main__':
             # -------  Load ICAR and crop to remove boundary effects:  -----
             # dsICAR=xr.open_mfdataset(files_m).load()
             dsICAR = xr.open_mfdataset(files_m)
+
+            # - - -   add relative humidity to ds - - -
+            if calc_relhum:
+                dsICAR = add_relhum_to_ds( dsICAR )
 
             # - - - - mask lakes  - - - -
             """I would recommend a fill 1 grid cell in all directions first to minimize the distance you are filling from, then a fill W->E all the way across to fill in all the lakes.  Then when it is regridded, you will be regridding to a dataset (livneh) that doesn't have "lakes" in it to begin with other than great salt lake, so if people use the data, they are mosly thinking of it as "land" air temperatures anyway. But we should have a value at all the gridcells the Livneh dataset as a value."""

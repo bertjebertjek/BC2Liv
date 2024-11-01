@@ -47,7 +47,9 @@ bc_by_month = True  # bias correct per month (default=True)
 noise       = True  # add noise to the daily values in the bias correction procedure (default=True)
 test        = False # reduces datasets for faster processing, incorrect results!
 
-
+ref_start = '1950-01-01'  # the range of the reference dataset that overlaps with the obs. NOTE: Different for CMIP5!
+# ref_end   = '2014-12-31'   # '2004-12-31' for CMIP5!
+ref_end   = '2018-12-31'
 
 ############################################
 #                functions
@@ -65,6 +67,30 @@ def process_command_line():
     return parser.parse_args()
 
 
+
+def determine_time_step(path_to_files):
+    """returns nr of timesteps per day (integer) """
+    try:
+        ds=xr.open_mfdataset(path_to_files)
+    except OSError:
+        print(f"   cannot open {path_to_files}")
+        sys.exit()
+
+    # Determine which month, timestep (hour or 3hr or...)
+    timestep =  (ds.time.diff(dim='time')).mean().values
+    timestep_h = int(timestep/60/60/1000/1000/1000)
+    ts_p_day = int(24/timestep_h)  # nr of timesteps per day
+
+    print(f" Input timestep is {timestep}, or {timestep_h}hr")
+    try:
+        calendar=ds.time.dt.calendar
+    except:
+        try:
+            calendar=ds.time.encoding['calendar']
+        except:
+            calendar="could not determine calendar"
+    print(f" calendar is: {calendar}")    # or {ds.time.encoding['calendar']}
+    return ts_p_day
 
 def get_icar_filelist(start_year, end_year, dt="3hr"): #,base_in=""):
     """returns a list of files (with full path) that fall within the period between start_year, end_year (strings %Y or int)"""
@@ -89,30 +115,34 @@ def get_icar_filelist(start_year, end_year, dt="3hr"): #,base_in=""):
             files.extend( glob.glob(f'{base_in}/{model}_{scen_load}_2005_2050/{dt}/icar_*_{y}*.nc') )
             files.extend( glob.glob(f'{base_in}/{model}_{scen_load}_2050_2100/{dt}/icar_*_{y}*.nc') )
 
+    print(f"   found {len(files)} in {base_in} between {start_year} and {end_year}")
     err_path=f'{base_in}/{model}_{scen_load}_XXXX'
-    if len(files)==0: print(f"\n ERROR: could not load files from {err_path}")
+    if len(files)==0: print(f"\n ERROR: could not load {dt} files from {err_path}")
 
     return sorted(files)
 
 
-def get_icar_filelist_CMIP5(start_year, end_year, dt="daily"): # Ryan has CMIP5 daily w/o cp, so use those for reference:
-    base_CMIP5 = "/glade/campaign/ral/hap/currierw/icar/output"
+# def get_icar_filelist_CMIP5(start_year, end_year, dt="daily"): # Ryan has CMIP5 daily w/o cp, so use those for reference:
+#     # NEED TO REGRID FIRST!!! !!!
+#     base_CMIP5 = "/glade/campaign/ral/hap/currierw/icar/output"
 
-    if scen[:4]=="hist" and CMIP=="CMIP5":
-        scen_load="rcp45"
+#     if scen[:4]=="hist" and CMIP=="CMIP5":
+#         scen_load="rcp45"
+#     else:
+#         scen_load=scen
 
-    files=[]
-    for y in range(int(start_year), int(end_year)+1) :
+#     files=[]
+#     for y in range(int(start_year), int(end_year)+1) :
 
-        if CMIP=="CMIP5":
-            files.extend( glob.glob(f'{base_CMIP5}/{model}_historical/{dt}/icar_*_{y}*.nc') )
-            files.extend( glob.glob(f'{base_CMIP5}/{model}_{scen_load}_2005_2050/{dt}/icar_*_{y}*.nc') )
-            files.extend( glob.glob(f'{base_CMIP5}/{model}_{scen_load}_2050_2100/{dt}/icar_*_{y}*.nc') )
+#         if CMIP=="CMIP5":
+#             files.extend( glob.glob(f'{base_CMIP5}/{model}_historical/{dt}/icar_*_{y}*.nc') )
+#             files.extend( glob.glob(f'{base_CMIP5}/{model}_{scen_load}_2005_2050/{dt}/icar_*_{y}*.nc') )
+#             files.extend( glob.glob(f'{base_CMIP5}/{model}_{scen_load}_2050_2100/{dt}/icar_*_{y}*.nc') )
 
-    err_path=f'{base_CMIP5}/{model}_{scen_load}_XXXX'
-    if len(files)==0: print(f"\n ERROR: could not load files from {err_path}")
+#     err_path=f'{base_CMIP5}/{model}_{scen_load}_XXXX'
+#     if len(files)==0: print(f"\n ERROR: could not load files from {err_path}")
 
-    return sorted(files)
+#     return sorted(files)
 
 
 def get_livneh(icar_1file):
@@ -207,6 +237,13 @@ def get_dsRef_ex5y(dsRef_full, fiveY_s, fiveY_e, ref_start, ref_end ):
 
         return dsI_ref
 
+def check_mem():
+
+    # Getting % usage of virtual_memory ( 3rd field)
+    print('      * * *   RAM memory % used:', psutil.virtual_memory()[2], '   * * *   ')
+    # Getting usage of virtual_memory in GB ( 4th field)
+    print('      * * *   RAM Used (GB):', psutil.virtual_memory()[3]/1000000000, '   * * *   ')
+
 
 ############################################
 #                Main                      #
@@ -227,10 +264,14 @@ if __name__ == '__main__':
     print(' ########################################################', '\n')
 
     # set paths based on cmip:
-    base_in  = f"/glade/derecho/scratch/bkruyt/{CMIP}/WUS_icar_LivGrd3"   # lakes masked in ta2m only
-    # path_out = f"/glade/campaign/ral/hap/bert/{CMIP}/WUS_icar_livBC"
-    # path_out = f"/glade/campaign/ral/hap/bert/{CMIP}/WUS_icar_livBC2"  # <--- !!
-    path_out = f"/glade/campaign/ral/hap/bert/{CMIP}/WUS_icar_livBC3"  # <--- !! lakes maskes ta2m only
+    if CMIP=="CMIP6":
+        base_in  = f"/glade/derecho/scratch/bkruyt/{CMIP}/WUS_icar_LivGrd3"   # lakes masked in ta2m only
+        path_out = f"/glade/campaign/ral/hap/bert/{CMIP}/WUS_icar_livBC3"  # <--- !! lakes maskes ta2m only
+        # path_out = f"/glade/campaign/ral/hap/bert/{CMIP}/WUS_icar_livBC4" # test for ta2m anomaly
+    elif CMIP=="CMIP5":
+        base_in  = f"/glade/derecho/scratch/bkruyt/{CMIP}/WUS_icar_LivGrd4" # lakes masked in ta2m only, correct cp removed 20240817
+        path_out = f"/glade/campaign/ral/hap/bert/{CMIP}/WUS_icar_livBC4"
+
 
     verbose=True  # more print statements at runtime.
 
@@ -239,7 +280,7 @@ if __name__ == '__main__':
         os.makedirs(f"{path_out}/{model}_{scen}/{dt}_pcp")
         print("Created directory " + f"{path_out}/{model}_{scen}/{dt}_pcp")
 
-    var_to_correct = 'precip_dt'
+    # var_to_correct = 'precip_dt'
 
 
     ##################### define periods: ######################
@@ -287,18 +328,20 @@ if __name__ == '__main__':
             print(f"   last block did not run to completion, (re)starting at {time_s[ts]}")
 
     elif int(args.part)==3:  # custom
-        # time_s=['2045-01-01', '2050-01-01']
-        # time_f=['2049-12-31', '2054-12-31']
-        time_s=['2050-01-01']
-        time_f=['2054-12-31']
+        # time_s=['2025-01-01', '2030-01-01','2035-01-01', '2040-01-01']
+        # time_f=['2029-12-31', '2034-12-31','2039-12-31', '2044-12-31']
+        time_s=['2065-01-01']
+        time_f=['2069-12-31']
+        # time_s=['1950-01-01','1970-01-01']
+        # time_f=['1954-12-31', '1974-12-31' ]
+        # time_s=['2005-01-01', '2010-01-01', '2055-01-01']
+        # time_f=['2009-12-31', '2014-12-31', '2059-12-31']
         ts=0
 
 
 
     #- - - - - - -B.  define (full) reference period - - - - - - -
-    ref_start = '1950-01-01'  # the range of the reference dataset that overlaps with the obs. NOTE: Different for CMIP5!
-    # ref_end   = '2014-12-31'   # '2004-12-31' for CMIP5!
-    ref_end   = '2018-12-31'
+
 
     print("      Memory use before loading anythng:")
     # Getting % usage of virtual_memory ( 3rd field)
@@ -306,17 +349,24 @@ if __name__ == '__main__':
     # Getting usage of virtual_memory in GB ( 4th field)
     print('      * * *   RAM Used (GB):', psutil.virtual_memory()[3]/1000000000, '   * * *   ')
 
-    # # get file list for full ref period: !! load 3hr, then make daily files, cause we need daily for bias correction.
-    # files_ref = get_icar_filelist(ref_start.split('-')[0], ref_end.split('-')[0], dt="daily")
-    if CMIP=="CMIP6":
+    # # get file list for full ref period: !! try to load daily, otherwise 3hr, then make daily files, cause we need daily for bias correction.
+    files_ref = get_icar_filelist(ref_start.split('-')[0], ref_end.split('-')[0], dt="daily")
+    if len(files_ref) >= ( int(ref_end.split('-')[0]) -int(ref_start.split('-')[0])):
+        print(f"   found {len(files_ref)} daily ref files")
+    else:
         files_ref = get_icar_filelist(ref_start.split('-')[0], ref_end.split('-')[0], dt="3hr")
-    elif CMIP=="CMIP5":
-        files_ref = get_icar_filelist_CMIP5(ref_start.split('-')[0], ref_end.split('-')[0], dt="yearly")
+        print(f"   found {len(files_ref)} 3hr ref files")
+
 
     print(f"   loading {len(files_ref)} icar files: {files_ref[0].split('/')[-1]} to {files_ref[-1].split('/')[-1]} ")
-    # print(files_ref)
 
-    dsR = xr.open_mfdataset( files_ref)
+
+    try:
+        dsR       = xr.open_mfdataset( files_ref)
+    except:
+        dsR       = xr.open_mfdataset( files_ref, combine='nested', compat='override')
+        print(f"\n   !!! Warning: issues combining ref data were circumvented by using compat='override' !!! \n")
+
     if 'precip_dt' in dsR.data_vars:
         pcp_var_R='precip_dt'
     elif 'Prec' in dsR.data_vars:
@@ -327,24 +377,21 @@ if __name__ == '__main__':
 
 
     try:
-        if dt is not "daily":
+        if determine_time_step(files_ref[0]) > 1:
+        # if dt is not "daily":
+            print(f"  making daily reference data")
             dsRef_full = dsR[pcp_var_R].resample(time='1D').sum(dim='time').load()
         else:
             dsRef_full = dsR[pcp_var_R].load()
     except:
         print("ERROR:  could not load or resample ref data.")
         sys.exit()
-        # dsRef_full = dsR[pcp_var_R].load()
-    # elif CMIP=="CMIP5":
-    #     dsRef_full = xr.open_mfdataset( files_ref)['Prec'].load()
 
     print(f"   Ref full time: {dsRef_full.time.values.min()} to {dsRef_full.time.max().values} ")
 
-    print("      Memory use after loading daily ICAR ref:")
-    # Getting % usage of virtual_memory ( 3rd field)
-    print('      * * *   RAM memory % used:', psutil.virtual_memory()[2], '   * * *   ')
-    # Getting usage of virtual_memory in GB ( 4th field)
-    print('      * * *   RAM Used (GB):', psutil.virtual_memory()[3]/1000000000, '   * * *   ')
+    if verbose:
+        print("      Memory use after loading daily ICAR ref:")
+        check_mem()
 
     # - - - - - C. Define data to match:  (Livneh) - - - - -
     icar_1_for_grid = xr.open_mfdataset( files_ref[0])  # one ICAR file to crop livneh with
@@ -353,11 +400,9 @@ if __name__ == '__main__':
     #load the var to correct;
     livneh_pr   = livneh_pr.load()
 
-    print("      Memory after loading livneh (bf starting 5y loop):")
-    # Getting % usage of virtual_memory ( 3rd field)
-    print('      * * *   RAM memory % used:', psutil.virtual_memory()[2], '   * * *   ')
-    # Getting usage of virtual_memory in GB ( 4th field)
-    print('      * * *   RAM Used (GB):', psutil.virtual_memory()[3]/1000000000, '   * * *   ')
+    if verbose:
+        print("      Memory after loading livneh (bf starting 5y loop):")
+        check_mem()
 
 
 
@@ -382,22 +427,17 @@ if __name__ == '__main__':
         # --------  the bias correction functions    ---------
         pcp_corrected_ds = correct_precip( this_ds=dsI_in, dsObs=livneh_pr, dsRef=dsRef_ex5y,   bc_by_month=bc_by_month, noise=noise, verbose=verbose)
 
-
-        print("      Memory use after bc:")
-        # Getting % usage of virtual_memory ( 3rd field)
-        print('   * * *   RAM memory % used:', psutil.virtual_memory()[2], '   * * *   ')
-        # Getting usage of virtual_memory in GB ( 4th field)
-        print('   * * *   RAM Used (GB):', psutil.virtual_memory()[3]/1000000000, '   * * *   ')
+        if verbose:
+            print("      Memory use after bc:")
+            check_mem()
 
 
         #####################   # save to file   ######################
         pcp_corrected_ds.to_netcdf( f"{path_out}/{model}_{scen}/{dt}_pcp/icar_{dt}_livgrid_{model}_{scen.split('_')[0]}_{time_s[t].split('-')[0]}-{time_f[t].split('-')[0]}.nc" )
 
-        print("      Memory use after saving to file:")
-        # Getting % usage of virtual_memory ( 3rd field)
-        print('   * * *   RAM memory % used:', psutil.virtual_memory()[2], '   * * *   ')
-        # Getting usage of virtual_memory in GB ( 4th field)
-        print('   * * *   RAM Used (GB):', psutil.virtual_memory()[3]/1000000000, '   * * *   ')
+        if verbose:
+            print("      Memory use after saving to file:")
+            check_mem()
 
         print(" \n ")
         print("    - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - ")
