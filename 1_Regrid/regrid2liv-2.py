@@ -205,6 +205,8 @@ if __name__ == '__main__':
         # file_prefix="ICAR_noGCMcp"  #CMIP5 with cp removed
     # elif CMIP=="CMIP5" and dt=="daily":
     #     file_prefix="icar_daily"  #CMIP5 daily
+    elif CMIP=="CESM2":
+        file_prefix="icar_*"
     else:
         print("   ! ! ! file_prefix unknown ! ! ! !")
     print(f"   {CMIP}, file_prefix: {file_prefix}")
@@ -283,6 +285,9 @@ if __name__ == '__main__':
             elif (CMIP=="CMIP5" and scenario[-10:]=='_2050_2100' and int(year)==2050 and m<10):
                 print("skipping ", CMIP, scenario, year, ' month', m)
                 continue
+            elif (CMIP=="CESM2" ):
+                print("skipping ", CMIP, " not implemented for 3hr yet")
+                sys.exit()
 
             files_m = glob.glob(f"{ICAR_nocp_path}/{model}_{scenario}/{dt}/{file_prefix}_{model}_{scen}_{year}-{str(m).zfill(2)}*.nc")
             print(f"   opening {ICAR_nocp_path}/{model}_{scenario}/{dt}/{file_prefix}_{model}_{scen}_{year}-{str(m).zfill(2)}*.nc")
@@ -356,7 +361,10 @@ if __name__ == '__main__':
         # if int(year)==2005 and scen=="hist":
         #     files = glob.glob(f"{ICAR_nocp_path}/{model}_{scenario}/{dt}/{file_prefix}_{model}_{scen}_{year}-0*.nc")  #
 
-        files = glob.glob(f"{ICAR_nocp_path}/{model}_{scenario}/{dt}/{file_prefix}_{model}_{scen}_{year}*.nc")  #  generic
+        if CMIP=="CESM2":
+            files = glob.glob(f"{ICAR_nocp_path}/{model}-{scenario}/{file_prefix}_*_{year}*.nc")
+        else:
+            files = glob.glob(f"{ICAR_nocp_path}/{model}_{scenario}/{dt}/{file_prefix}_{model}_{scen}_{year}*.nc")  #  generic
 
         print("\n- - - - - - - - - -   opening ICAR file(s) to correct - - - - - - - - - - - - ")
         # print(files)
@@ -381,12 +389,15 @@ if __name__ == '__main__':
             dsICAR.sel(time=slice("2050-10-01", None))
         elif (CMIP=="CMIP5" and scenario[-10:]=='_2050_2100' and int(year)==2050):
             dsICAR.sel(time=slice("2050-10-01", None))
+        # elif (CMIP=="CESM2"):  ## no subsetting needed?
+        #     dsICAR.sel(time=slice("1900-01-01", None))
 
         livneh_pr = get_livneh(icar_pcp=dsICAR.isel(time=0)).load() # get before cropping ICAR
 
 
         # - - - - mask lakes  - - - -
-        if CMIP=="CMIP6" and mask:
+        # if CMIP=="CMIP6" and mask:
+        if mask:
             geo = xr.open_dataset(geo_file)
             msk = (geo.isel(Time=0).LANDMASK==1).values
             # dsICAR = dsICAR.where(msk)

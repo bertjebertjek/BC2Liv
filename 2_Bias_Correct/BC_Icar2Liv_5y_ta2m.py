@@ -107,6 +107,8 @@ def get_icar_ref_filelist(start_year, end_year, dt="3hr"):
             files.extend( glob.glob(f'{ref_in}/{model}_historical/{dt}/icar_*_{y}*.nc') )
             files.extend( glob.glob(f'{ref_in}/{model}_{scen_load}_2005_2050/{dt}/icar_*_{y}*.nc') )
             files.extend( glob.glob(f'{ref_in}/{model}_{scen_load}_2050_2100/{dt}/icar_*_{y}*.nc') )
+        elif CMIP=="CESM2":
+            files.extend( glob.glob(f'{base_in}/{model}_{scen_load}/{dt}/icar_*_{y}*.nc') )
     # sort files:
     files=sorted(files)
 
@@ -199,6 +201,39 @@ def relative_humidity(t,qv,p):
 
         return relative_humidity
 
+def get_dsRef_full(ref_start, ref_end):
+    """returns the full reference dataset, cropped to the ICAR grid"""
+
+    # get file list for full ref period: try to load daily, if not: load 3hr, make daily.
+    print(f"* * * loading Reference data... * * *")
+    files_ref = get_icar_ref_filelist(ref_start.split('-')[0], ref_end.split('-')[0], dt="daily")
+    if len(files_ref) >= ( int(ref_end.split('-')[0]) -int(ref_start.split('-')[0])):
+        print(f"   found {len(files_ref)} daily ref files")
+    else:
+        files_ref = get_icar_ref_filelist(ref_start.split('-')[0], ref_end.split('-')[0], dt="3hr")
+        print(f"   found {len(files_ref)} 3hr ref files")
+
+    print(f"   loading {len(files_ref)} icar files: {files_ref[0].split('/')[-1]} to {files_ref[-1].split('/')[-1]} ")
+
+    try:
+        dsRef_full = xr.open_mfdataset( files_ref)
+    except:
+        dsRef_full = xr.open_mfdataset( files_ref, combine='nested', compat='override')
+        print(f"\n   !!! Warning: issues combining ref data were circumvented by using compat='override' !!! \n")
+
+    print(f"   Ref full time: {dsRef_full.time.values.min()} to {dsRef_full.time.max().values} ")
+
+    # # make TMin/Tmax from Ref:
+    if 'Tmin' in dsRef_full.data_vars:
+        dsTmin_ref = dsRef_full.Tmin.load()
+        dsTmax_ref = dsRef_full.Tmax.load()
+    else:
+        print("   making daily tmin/tmax values from 3hr ta2m Reference data")
+        dsTmin_ref = dsRef_full.ta2m.resample(time='1D').min(dim='time').load()
+        dsTmax_ref = dsRef_full.ta2m.resample(time='1D').max(dim='time').load()
+
+
+    return dsTmin_ref, dsTmax_ref
 
 
 def get_dsRef_ex5y(dsRef_full, fiveY_s, fiveY_e, ref_start, ref_end ):
@@ -280,6 +315,10 @@ if __name__ == '__main__':
         base_in = f"/glade/campaign/ral/hap/bert/{CMIP}/WUS_icar_livBC4" # BC PCP as input
         ref_in  = f"/glade/derecho/scratch/bkruyt/{CMIP}/WUS_icar_LivGrd4"
         path_out = f"/glade/campaign/ral/hap/bert/{CMIP}/WUS_icar_livBC4"  # 4: Correct GCM cp removed in postproccessing.
+    elif CMIP=="CESM2":
+        ref_in  = f"/glade/campaign/ral/hap/bert/CESM2/livneh/regrid_input" # referenece files (for T only)
+        path_out = f"/glade/campaign/ral/hap/bert/CESM2/livneh/bias_corrected"
+        base_in  = path_out # input files already have pcp corrected
 
 
     # create out dir if it does not exist
@@ -293,7 +332,7 @@ if __name__ == '__main__':
         print("Created directory " + f"{path_out}/{model}_{scen}/{dt}_ta2m")
 
 
-    ##################### define periods: ######################
+    ##################### define periods: (refactor) ######################
 
     if CMIP=="CMIP6": # historical until 2014-12-31
         if scen[:4]=="hist":
@@ -310,6 +349,11 @@ if __name__ == '__main__':
         else:
             time_s=['2005-01-01','2010-01-01','2015-01-01','2020-01-01','2025-01-01','2030-01-01','2035-01-01','2040-01-01','2045-01-01','2050-01-01','2055-01-01','2060-01-01','2065-01-01','2070-01-01','2075-01-01','2080-01-01','2085-01-01','2090-01-01','2095-01-01']
             time_f=['2009-12-31','2014-12-31','2019-12-31','2024-12-31','2029-12-31','2034-12-31','2039-12-31','2044-12-31','2049-12-31','2054-12-31','2059-12-31','2064-12-31','2069-12-31','2074-12-31','2079-12-31','2084-12-31','2089-12-31','2094-12-31','2099-12-30']
+    elif CMIP=="CESM2":
+            time_s=[
+                '1900-01-01','1905-01-01','1910-01-01','1915-01-01','1920-01-01','1925-01-01','1930-01-01','1935-01-01','1940-01-01','1945-01-01','1950-01-01','1955-01-01','1960-01-01','1965-01-01','1970-01-01','1975-01-01','1980-01-01','1985-01-01','1990-01-01','1995-01-01','2000-01-01','2005-01-01','2010-01-01','2015-01-01','2020-01-01','2025-01-01','2030-01-01','2035-01-01','2040-01-01','2045-01-01','2050-01-01','2055-01-01','2060-01-01','2065-01-01','2070-01-01','2075-01-01','2080-01-01','2085-01-01','2090-01-01','2095-01-01']
+            time_f=[
+                '1904-12-31','1909-12-31','1914-12-31','1919-12-31','1924-12-31','1929-12-31','1934-12-31','1939-12-31','1944-12-31','1949-12-31','1954-12-31','1959-12-31','1964-12-31','1969-12-31','1974-12-31','1979-12-31','1984-12-31','1989-12-31','1994-12-31','1999-12-31','2004-12-31','2009-12-31','2014-12-31','2019-12-31','2024-12-31','2029-12-31','2034-12-31','2039-12-31','2044-12-31','2049-12-31','2054-12-31','2059-12-31','2064-12-31','2069-12-31','2074-12-31','2079-12-31','2084-12-31','2089-12-31','2094-12-31','2099-12-30']
 
 
     if int(args.part)==1:
@@ -368,42 +412,14 @@ if __name__ == '__main__':
     # Getting usage of virtual_memory in GB ( 4th field)
     print('      * * *   RAM Used (GB):', psutil.virtual_memory()[3]/1000000000, '   * * *   ')
 
-
-    # get file list for full ref period: try to load daily, if not: load 3hr, make daily.
-    print(f"* * * loading Reference data... * * *")
-    files_ref = get_icar_ref_filelist(ref_start.split('-')[0], ref_end.split('-')[0], dt="daily")
-    if len(files_ref) >= ( int(ref_end.split('-')[0]) -int(ref_start.split('-')[0])):
-        print(f"   found {len(files_ref)} daily ref files")
-    else:
-        files_ref = get_icar_ref_filelist(ref_start.split('-')[0], ref_end.split('-')[0], dt="3hr")
-        print(f"   found {len(files_ref)} 3hr ref files")
-
-    # if CMIP=="CMIP6":
-    #     files_ref = get_icar_ref_filelist(ref_start.split('-')[0], ref_end.split('-')[0], dt="3hr")
-    # elif CMIP=="CMIP5":
-    #     files_ref = get_icar_filelist_CMIP5(ref_start.split('-')[0], ref_end.split('-')[0], dt="yearly")
-    print(f"   loading {len(files_ref)} icar files: {files_ref[0].split('/')[-1]} to {files_ref[-1].split('/')[-1]} ")
-
-    try:
-        dsRef_full = xr.open_mfdataset( files_ref)
-    except:
-        dsRef_full = xr.open_mfdataset( files_ref, combine='nested', compat='override')
-        print(f"\n   !!! Warning: issues combining ref data were circumvented by using compat='override' !!! \n")
-
-    print(f"   Ref full time: {dsRef_full.time.values.min()} to {dsRef_full.time.max().values} ")
-
-    # # make TMin/Tmax from Ref:
-    if 'Tmin' in dsRef_full.data_vars:
-        dsTmin_ref = dsRef_full.Tmin.load()
-        dsTmax_ref = dsRef_full.Tmax.load()
-    else:
-        print("   making daily tmin/tmax values from 3hr ta2m Reference data")
-        dsTmin_ref = dsRef_full.ta2m.resample(time='1D').min(dim='time').load()
-        dsTmax_ref = dsRef_full.ta2m.resample(time='1D').max(dim='time').load()
+    dsTmin_ref, dsTmax_ref = get_dsRef_full(ref_start, ref_end)
 
 
     # - - - - - C. Define data to match:  (Livneh) - - - - -
+
+    files_ref =  get_icar_ref_filelist(ref_start.split('-')[0], ref_start.split('-')[0], dt=dt)  # one ICAR file to crop livneh with
     icar_1_for_grid = xr.open_mfdataset( files_ref[0])  # one ICAR file to crop livneh with
+
     livneh_tmin, livneh_tmax = get_livneh_T(icar_1file=icar_1_for_grid.isel(time=0))
 
     #load the var to correct;

@@ -114,8 +114,11 @@ def get_icar_filelist(start_year, end_year, dt="3hr"): #,base_in=""):
             files.extend( glob.glob(f'{base_in}/{model}_historical/{dt}/icar_*_{y}*.nc') )
             files.extend( glob.glob(f'{base_in}/{model}_{scen_load}_2005_2050/{dt}/icar_*_{y}*.nc') )
             files.extend( glob.glob(f'{base_in}/{model}_{scen_load}_2050_2100/{dt}/icar_*_{y}*.nc') )
+        elif CMIP=="CESM2":
+            files.extend( glob.glob(f'{base_in}/{model}_{scen_load}/{dt}/icar_*_{y}*.nc') )
+            # files.extend( glob.glob(f'{base_in}/{model}_ssp370_2015_2099/{dt}/icar_*_{y}*.nc') )
 
-    print(f"   found {len(files)} in {base_in} between {start_year} and {end_year}")
+    print(f"   found {len(files)} files in {base_in} between {start_year} and {end_year}")
     err_path=f'{base_in}/{model}_{scen_load}_XXXX'
     if len(files)==0: print(f"\n ERROR: could not load {dt} files from {err_path}")
 
@@ -203,6 +206,60 @@ def relative_humidity(t,qv,p):
         return relative_humidity
 
 
+def get_dsRef_full(ref_start, ref_end):
+    """returns the full reference dataset, cropped to the ICAR grid"""
+
+    # print("      Memory use before loading anythng:")
+    # # Getting % usage of virtual_memory ( 3rd field)
+    # print('      * * *   RAM memory % used:', psutil.virtual_memory()[2], '   * * *   ')
+    # # Getting usage of virtual_memory in GB ( 4th field)
+    # print('      * * *   RAM Used (GB):', psutil.virtual_memory()[3]/1000000000, '   * * *   ')
+
+    # # get file list for full ref period: !! try to load daily, otherwise 3hr, then make daily files, cause we need daily for bias correction.
+    files_ref = get_icar_filelist(ref_start.split('-')[0], ref_end.split('-')[0], dt="daily")
+    if len(files_ref) >= ( int(ref_end.split('-')[0]) -int(ref_start.split('-')[0])):
+        print(f"   found {len(files_ref)} daily ref files")
+    else:
+        files_ref = get_icar_filelist(ref_start.split('-')[0], ref_end.split('-')[0], dt="3hr")
+        print(f"   found {len(files_ref)} 3hr ref files")
+
+    print(f"   loading {len(files_ref)} icar files: {files_ref[0].split('/')[-1]} to {files_ref[-1].split('/')[-1]} ")
+
+    try:
+        dsR       = xr.open_mfdataset( files_ref)
+    except:
+        dsR       = xr.open_mfdataset( files_ref, combine='nested', compat='override')
+        print(f"\n   !!! Warning: issues combining ref data were circumvented by using compat='override' !!! \n")
+
+    if 'precip_dt' in dsR.data_vars:
+        pcp_var_R='precip_dt'
+    elif 'Prec' in dsR.data_vars:
+        pcp_var_R='Prec'
+    elif 'precipitation' in dsR.data_vars:
+        pcp_var_R='precipitation'
+    print(f"      Ref data precip var is {pcp_var_R}")
+
+    try:
+        if determine_time_step(files_ref[0]) > 1:
+        # if dt is not "daily":
+            print(f"  making daily reference data")
+            dsRef_full = dsR[pcp_var_R].resample(time='1D').sum(dim='time').load()
+        else:
+            dsRef_full = dsR[pcp_var_R].load()
+    except:
+        print("ERROR:  could not load or resample ref data.")
+        sys.exit()
+
+    print(f"   Ref full time: {dsRef_full.time.values.min()} to {dsRef_full.time.max().values} ")
+
+    if verbose:
+        print("      Memory use after loading daily ICAR ref:")
+        check_mem()
+
+    return dsRef_full
+
+
+
 
 def get_dsRef_ex5y(dsRef_full, fiveY_s, fiveY_e, ref_start, ref_end ):
         """ takes strings of form %Y-%M-%D, returns dsRef_full without the 5year period defined by fiveY_s to fiveY_e"""
@@ -271,7 +328,9 @@ if __name__ == '__main__':
     elif CMIP=="CMIP5":
         base_in  = f"/glade/derecho/scratch/bkruyt/{CMIP}/WUS_icar_LivGrd4" # lakes masked in ta2m only, correct cp removed 20240817
         path_out = f"/glade/campaign/ral/hap/bert/{CMIP}/WUS_icar_livBC4"
-
+    elif CMIP=="CESM2":
+        base_in  = f"/glade/campaign/ral/hap/bert/CESM2/livneh/regrid_input" # lakes masked in ta2m only, correct cp removed 20240817
+        path_out = f"/glade/campaign/ral/hap/bert/CESM2/livneh/bias_corrected"
 
     verbose=True  # more print statements at runtime.
 
@@ -279,8 +338,6 @@ if __name__ == '__main__':
     if not os.path.exists(f"{path_out}/{model}_{scen}/{dt}_pcp"):
         os.makedirs(f"{path_out}/{model}_{scen}/{dt}_pcp")
         print("Created directory " + f"{path_out}/{model}_{scen}/{dt}_pcp")
-
-    # var_to_correct = 'precip_dt'
 
 
     ##################### define periods: ######################
@@ -299,6 +356,11 @@ if __name__ == '__main__':
         else:
             time_s=['2005-01-01','2010-01-01','2015-01-01','2020-01-01','2025-01-01','2030-01-01','2035-01-01','2040-01-01','2045-01-01','2050-01-01','2055-01-01','2060-01-01','2065-01-01','2070-01-01','2075-01-01','2080-01-01','2085-01-01','2090-01-01','2095-01-01']
             time_f=['2009-12-31','2014-12-31','2019-12-31','2024-12-31','2029-12-31','2034-12-31','2039-12-31','2044-12-31','2049-12-31','2054-12-31','2059-12-31','2064-12-31','2069-12-31','2074-12-31','2079-12-31','2084-12-31','2089-12-31','2094-12-31','2099-12-30']
+    elif CMIP=="CESM2":
+            time_s=[
+                '1900-01-01','1905-01-01','1910-01-01','1915-01-01','1920-01-01','1925-01-01','1930-01-01','1935-01-01','1940-01-01','1945-01-01','1950-01-01','1955-01-01','1960-01-01','1965-01-01','1970-01-01','1975-01-01','1980-01-01','1985-01-01','1990-01-01','1995-01-01','2000-01-01','2005-01-01','2010-01-01','2015-01-01','2020-01-01','2025-01-01','2030-01-01','2035-01-01','2040-01-01','2045-01-01','2050-01-01','2055-01-01','2060-01-01','2065-01-01','2070-01-01','2075-01-01','2080-01-01','2085-01-01','2090-01-01','2095-01-01']
+            time_f=[
+                '1904-12-31','1909-12-31','1914-12-31','1919-12-31','1924-12-31','1929-12-31','1934-12-31','1939-12-31','1944-12-31','1949-12-31','1954-12-31','1959-12-31','1964-12-31','1969-12-31','1974-12-31','1979-12-31','1984-12-31','1989-12-31','1994-12-31','1999-12-31','2004-12-31','2009-12-31','2014-12-31','2019-12-31','2024-12-31','2029-12-31','2034-12-31','2039-12-31','2044-12-31','2049-12-31','2054-12-31','2059-12-31','2064-12-31','2069-12-31','2074-12-31','2079-12-31','2084-12-31','2089-12-31','2094-12-31','2099-12-30']
 
 
     if int(args.part)==1:
@@ -342,59 +404,13 @@ if __name__ == '__main__':
 
     #- - - - - - -B.  define (full) reference period - - - - - - -
 
+    dsRef_full = get_dsRef_full(ref_start, ref_end)
 
-    print("      Memory use before loading anythng:")
-    # Getting % usage of virtual_memory ( 3rd field)
-    print('      * * *   RAM memory % used:', psutil.virtual_memory()[2], '   * * *   ')
-    # Getting usage of virtual_memory in GB ( 4th field)
-    print('      * * *   RAM Used (GB):', psutil.virtual_memory()[3]/1000000000, '   * * *   ')
-
-    # # get file list for full ref period: !! try to load daily, otherwise 3hr, then make daily files, cause we need daily for bias correction.
-    files_ref = get_icar_filelist(ref_start.split('-')[0], ref_end.split('-')[0], dt="daily")
-    if len(files_ref) >= ( int(ref_end.split('-')[0]) -int(ref_start.split('-')[0])):
-        print(f"   found {len(files_ref)} daily ref files")
-    else:
-        files_ref = get_icar_filelist(ref_start.split('-')[0], ref_end.split('-')[0], dt="3hr")
-        print(f"   found {len(files_ref)} 3hr ref files")
-
-
-    print(f"   loading {len(files_ref)} icar files: {files_ref[0].split('/')[-1]} to {files_ref[-1].split('/')[-1]} ")
-
-
-    try:
-        dsR       = xr.open_mfdataset( files_ref)
-    except:
-        dsR       = xr.open_mfdataset( files_ref, combine='nested', compat='override')
-        print(f"\n   !!! Warning: issues combining ref data were circumvented by using compat='override' !!! \n")
-
-    if 'precip_dt' in dsR.data_vars:
-        pcp_var_R='precip_dt'
-    elif 'Prec' in dsR.data_vars:
-        pcp_var_R='Prec'
-    elif 'precipitation' in dsR.data_vars:
-        pcp_var_R='precipitation'
-    print(f"      Ref data precip var is {pcp_var_R}")
-
-
-    try:
-        if determine_time_step(files_ref[0]) > 1:
-        # if dt is not "daily":
-            print(f"  making daily reference data")
-            dsRef_full = dsR[pcp_var_R].resample(time='1D').sum(dim='time').load()
-        else:
-            dsRef_full = dsR[pcp_var_R].load()
-    except:
-        print("ERROR:  could not load or resample ref data.")
-        sys.exit()
-
-    print(f"   Ref full time: {dsRef_full.time.values.min()} to {dsRef_full.time.max().values} ")
-
-    if verbose:
-        print("      Memory use after loading daily ICAR ref:")
-        check_mem()
 
     # - - - - - C. Define data to match:  (Livneh) - - - - -
-    icar_1_for_grid = xr.open_mfdataset( files_ref[0])  # one ICAR file to crop livneh with
+    # one ICAR file to crop livneh with
+    files_ref =  get_icar_filelist(ref_start.split('-')[0], ref_start.split('-')[0], dt=dt)
+    icar_1_for_grid = xr.open_mfdataset( files_ref[0])
     livneh_pr = get_livneh(icar_1file=icar_1_for_grid.isel(time=0))
 
     #load the var to correct;
@@ -417,7 +433,7 @@ if __name__ == '__main__':
         files_in =  get_icar_filelist(time_s[t].split('-')[0], time_f[t].split('-')[0], dt=dt)
         dsI_in   =  xr.open_mfdataset( files_in ) # loaded in bc_func
 
-        print(f"   {len(files_in)} input monthly files, {dsI_in.time.values.min()} to  {dsI_in.time.values.max()}")
+        print(f"   {len(files_in)} input files, {dsI_in.time.values.min()} to  {dsI_in.time.values.max()}")
         # # subset reference data, (leave out 5years)
         dsRef_ex5y= get_dsRef_ex5y(dsRef_full,  fiveY_s=time_s[t], fiveY_e=time_f[t], ref_start=ref_start, ref_end=ref_end )
 

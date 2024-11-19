@@ -19,19 +19,19 @@ CMIP=CMIP6
 # # # # # #    Setings     # # # # # #
 dt=3hr
 # dt=daily
-part=2  # part 1 = from start; part 2 = look for last output file and restart there : 3=custom (in case we need to rerun sth.)
+part=3  # part 1 = from start; part 2 = look for last output file and restart there : 3=custom (in case we need to rerun sth.)
 
 
 if [ "$CMIP" == "CMIP5" ] ; then
     # allMods=( CCSM4 CMCC-CM CNRM-CM5 CanESM2 GFDL-CM3 MIROC5 MRI-CGCM3 )# HadGEM2-ES
-    allMods=( CanESM2  ) # CCSM4 CMCC-CM CNRM-CM5 CanESM2 GFDL-CM3 MIROC5 MIROC5 CCSM4
-    # allScens=( historical rcp45 rcp85 )
-    allScens=( rcp45 )
+    allMods=( CCSM4 CMCC-CM CNRM-CM5 GFDL-CM3 MIROC5 MRI-CGCM3 )
+    allScens=( historical rcp45 rcp85 )
+    # allScens=( historical )
 elif [ "$CMIP" == "CMIP6" ] ; then
     # allMods=( CanESM5 CMCC-CM2-SR5 MIROC-ES2L NorESM2-MM ) #
     allMods=( MPI-M.MPI-ESM1-2-LR ) # ) #
     # allScens=(  ssp245  ssp370 ssp585  )
-    allScens=( hist )
+    allScens=( ssp585 )
 fi
 echo "########################################################## "
 echo " Submitting ta2m bias correction to Livneh grid for: "
@@ -55,13 +55,14 @@ for model in ${allMods[@]} ; do
     cat <<EOS | qsub -
     #!/bin/bash
 
-    #PBS -l select=1:ncpus=1:mem=350GB
-    #PBS -l walltime=12:00:00
+    #PBS -l select=1:ncpus=1:mem=70GB
+    #PBS -l walltime=00:40:00
     #PBS -A P48500028
     #PBS -q casper
     #PBS -N T_$model
     #PBS -o job_output/BC2LIV_CMIP5_TA2M.out
     #PBS -j oe
+    #PBS -m n
 
     module load conda
     conda activate mypy39
@@ -70,9 +71,12 @@ for model in ${allMods[@]} ; do
 
     # # #    Run the script    # # #
     mkdir -p job_auto_${CMIP}_ta2m_${dt}
-    python -u BC_Icar2Liv_5y_ta2m.py $model $scen $part $dt $CMIP >& job_auto_${CMIP}_ta2m_${dt}/${model}_${scen}_${dt}
+    # python -u BC_Icar2Liv_5y_ta2m.py $model $scen $part $dt $CMIP >& job_auto_${CMIP}_ta2m_${dt}/${model}_${scen}_${dt}
 
+    # # # Diagnostic (more print statements)
+    python -u BC_Icar2Liv_5y_ta2m_diagn.py $model $scen $part $dt $CMIP >& test2.out
 
+    # # # #>& job_auto_${CMIP}_ta2m_${dt}/${model}_${scen}_${dt}
 EOS
 
 done

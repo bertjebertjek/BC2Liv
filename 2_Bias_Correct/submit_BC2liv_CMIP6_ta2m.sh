@@ -3,8 +3,8 @@
 #PBS -l walltime=03:00:00
 #PBS -A P48500028
 #PBS -q casper
-#PBS -N pBC2Liv
-#PBS -o job_output/BC2LIV_CMIP5_PCP.out
+#PBS -N tBC2Liv
+#PBS -o job_output/BC2LIV_CMIP5_TA2M.out
 #PBS -j oe
 
 
@@ -34,7 +34,7 @@ elif [[ "${CMIP}" == "CMIP6" ]]; then
     # model=NorESM2-MM
     # model=MIROC-ES2L
     # model=MPI-M.MPI-ESM1-2-LR
-    # allScens=( hist ssp585 ssp370 ssp245 ) #
+
     allScens=( ssp245 )
     # allScens=( ssp245 ssp370 ssp585 hist)
 fi
@@ -46,10 +46,6 @@ mkdir -p job_output_${CMIP}_pcp_${dt} #/BC_5y_${model}_${scen}_${dt}_${PBS_JOBID
 
 # # # #    Run the script    # # #
 
-# # # dev daily:
-python -u BC_Icar2Liv_5y_pcp.py $model $scen $part $dt $CMIP >& job_output_${CMIP}_pcp_${dt}/BC_5y_${model}_${scen}_${dt}_${PBS_JOBID::7}
-
-# # # test no Noise added:
-# python -u BC_Icar2Liv_5y_pcp_noNoise.py $model $scen $part $dt $CMIP >& job_output_${CMIP}_pcp_${dt}/BC_5y_${model}_${scen}_${dt}_${PBS_JOBID::7}
+python -u BC_Icar2Liv_5y_ta2m.py $model $scen $part $dt $CMIP >& job_output_${CMIP}_pcp_${dt}/BC_5y_${model}_${scen}_${dt}_${PBS_JOBID::7}
 
 done

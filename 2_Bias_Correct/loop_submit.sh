@@ -5,10 +5,10 @@
 #########################################################################################
 
 
-CMIP=CMIP6
-part=1  # part 1 = from start; part 2 = look for last output file and restart there : 3=custom (in case we need to rerun sth.)
-dt=3hr #
-# dt=daily
+CMIP=CESM2
+part=2  # part 1 = from start; part 2 = look for last output file and restart there : 3=custom (in case we need to rerun sth.)
+# dt=3hr #
+dt=daily
 
 # CMIP=CMIP5
 # part=1   # part 1 = from start; part 2 = look for last output file and restart there : 3=custom (in case we need to rerun sth.)
@@ -37,7 +37,21 @@ elif [ "$CMIP" == "CMIP6" ] ; then
     # allMods=( MIROC-ES2L  CMCC-CM2-SR5  )
     # allScens=( ssp370 ssp245 ssp585 hist ) #
     allScens=( ssp585 )
+
+#### CESM2 large ensemble (under development) ####
+elif [[ "${CMIP}" == "CESM2" ]]; then
+
+    #cesm2-le.010.hist-ssp370
+    path_in=/glade/campaign/ral/hap/bert/CESM2/livneh/regrid_input
+    path_out=/glade/campaign/ral/hap/bert/CESM2/livneh/bias_corrected
+
+    # allMods=( cesm2-le.010.hist )
+    allMods=( cesm2-le.008.hist cesm2-le.010.hist ) #cesm2-le.009.hist )
+    allScens=( ssp370 )
+
 fi
+
+
 
 #########################################################################################
 ###################                  Run the script               #######################

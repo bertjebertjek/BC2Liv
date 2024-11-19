@@ -4,7 +4,7 @@
 #PBS -A P48500028
 #PBS -q casper
 #PBS -N rgr2LivD
-#PBS -J 15-16:20
+#PBS -J 0-200:1
 #PBS -o job_output/array.out
 #PBS -j oe
 #PBS -r y
@@ -45,11 +45,12 @@ conda activate npl
 
 # ____________   Set arguments: (year = PBS_array_index) -_______________
 
-# alldts=( daily )
-alldts=( 3hr )
+alldts=( daily )
+# alldts=( 3hr )
 # alldts=( daily 3hr )
 
-CMIP=CMIP6
+# CMIP=CMIP6
+CMIP=CESM2 # need 200 jobs! (1900-2099)
 
 if [ "$CMIP" == "CMIP5" ] ; then
     allMods=( MIROC5 MRI-CGCM3 CanESM2 CCSM4 CMCC-CM CNRM-CM5   ) #  HadGEM2-ES  GFDL-CM3
@@ -78,6 +79,18 @@ elif [ "$CMIP" == "CMIP6" ] ; then
     path_in=/glade/campaign/ral/hap/bert/${CMIP}/WUS_icar_nocp_full # CMIP6
     path_out=/glade/derecho/scratch/bkruyt/${CMIP}/WUS_icar_LivGrd3 # lake mask ta2m
 
+#### CESM2 large ensemble (under development) ####
+elif [[ "${CMIP}" == "CESM2" ]]; then
+
+    path_in=/glade/campaign/ral/hap/gutmann/icar/cesm2le/daily_data   #cesm2-le.010.hist-ssp370
+    path_out=/glade/campaign/ral/hap/bert/CESM2/livneh/regrid_input
+
+
+    # allMods=( cesm2-le.010.hist )
+    allMods=( cesm2-le.008.hist cesm2-le.009.hist )
+    allScens=( ssp370 )
+
+
 fi
 
 
@@ -105,6 +118,8 @@ for scen in ${allScens[@]}; do
         start_year=2005
     elif [[ "${scen:5:10}" == "_2050_2100" ]]; then
         start_year=2050
+    elif [[ "${CMIP}" == "CESM2" ]]; then
+        start_year=1900
     else
         echo " start year unclear "
         exit 1
