@@ -1,10 +1,10 @@
 #!/bin/bash
 #PBS -l select=1:ncpus=1:mem=60GB
-#PBS -l walltime=02:00:00
+#PBS -l walltime=01:00:00
 #PBS -A P48500028
 #PBS -q casper
 #PBS -N rgr2LivD
-#PBS -J 0-200:1
+#PBS -J 0-1:1
 #PBS -o job_output/array.out
 #PBS -j oe
 #PBS -r y
@@ -49,8 +49,8 @@ alldts=( daily )
 # alldts=( 3hr )
 # alldts=( daily 3hr )
 
-# CMIP=CMIP6
-CMIP=CESM2 # need 200 jobs! (1900-2099)
+CMIP=CMIP6
+# CMIP=CESM2 # need 200 jobs! (1900-2099)
 
 if [ "$CMIP" == "CMIP5" ] ; then
     allMods=( MIROC5 MRI-CGCM3 CanESM2 CCSM4 CMCC-CM CNRM-CM5   ) #  HadGEM2-ES  GFDL-CM3
@@ -65,19 +65,23 @@ if [ "$CMIP" == "CMIP5" ] ; then
     path_out=/glade/derecho/scratch/bkruyt/${CMIP}/WUS_icar_LivGrd4
 
 elif [ "$CMIP" == "CMIP6" ] ; then
-    # allMods=( CanESM5 )  # CMCC-CM2-SR5 MPI-M.MPI-ESM1-2-LR  NorESM2-MM
-    # allMods=( CMCC-CM2-SR5 MIROC-ES2L MPI-M.MPI-ESM1-2-LR )
-    # allMods=( MIROC-ES2L )
-    allMods=(  MPI-M.MPI-ESM1-2-LR )
+    # allMods=( CanESM5 )
+    # allMods=( CMCC-CM2-SR5 )
+    allMods=( MIROC-ES2L )
+    # allMods=(  MPI-M.MPI-ESM1-2-LR )
     # allMods=( NorESM2-MM )
 
     # allScens=(  hist ssp245_2004 ssp245_2049 ssp370_2004 ssp370_2049 ssp585_2004 ssp585_2049 )
     # allScens=( ssp245_2004 ) # ssp370_2004 ssp585_2004)ssp245_2004 ssp585_2004 ssp585_2049
     # allScens=( hist ) # ssp370_2004 ssp370_2049 ssp585_2004
-    allScens=( ssp585_2049 )
+    allScens=( ssp245_2004 )
 
     path_in=/glade/campaign/ral/hap/bert/${CMIP}/WUS_icar_nocp_full # CMIP6
-    path_out=/glade/derecho/scratch/bkruyt/${CMIP}/WUS_icar_LivGrd3 # lake mask ta2m
+    path_out=/glade/derecho/scratch/bkruyt/${CMIP}/WUS_icar_LivGrd3 # lake mask ta2m + relhum
+
+    # ### great lakes domain:
+    # path_in=/glade/campaign/ral/hap/bert/CMIP6/greatlakes/GL_fix_nocp # CMIP6
+    # path_out=/glade/derecho/scratch/bkruyt/${CMIP}/GL_LivGrd # lake mask ta2m + relhum
 
 #### CESM2 large ensemble (under development) ####
 elif [[ "${CMIP}" == "CESM2" ]]; then

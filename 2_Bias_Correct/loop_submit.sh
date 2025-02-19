@@ -5,10 +5,10 @@
 #########################################################################################
 
 
-CMIP=CESM2
-part=2  # part 1 = from start; part 2 = look for last output file and restart there : 3=custom (in case we need to rerun sth.)
-# dt=3hr #
-dt=daily
+CMIP=CMIP6  # CESM2
+part=1  # part 1 = from start; part 2 = look for last output file and restart there : 3=custom (in case we need to rerun sth.)
+dt=3hr #
+# dt=daily
 
 # CMIP=CMIP5
 # part=1   # part 1 = from start; part 2 = look for last output file and restart there : 3=custom (in case we need to rerun sth.)
@@ -30,21 +30,18 @@ if [ "$CMIP" == "CMIP5" ] ; then
 #-----------------    CMIP6    ------------------------
 elif [ "$CMIP" == "CMIP6" ] ; then
     # allMods=( CanESM5  )
-    # allMods=( MIROC-ES2L )
     # allMods=( CMCC-CM2-SR5 )
-    allMods=( MPI-M.MPI-ESM1-2-LR ) #MIROC-ES2L  CMCC-CM2-SR5 )
-    # allMods=( NorESM2-MM  )
-    # allMods=( MIROC-ES2L  CMCC-CM2-SR5  )
-    # allScens=( ssp370 ssp245 ssp585 hist ) #
-    allScens=( ssp585 )
+    allMods=( MIROC-ES2L )
+    # allMods=( CanESM5 CMCC-CM2-SR5 MPI-M.MPI-ESM1-2-LR MIROC-ES2L  NorESM2-MM )
+    # allMods=( MPI-M.MPI-ESM1-2-LR )
+    # allMods=( MIROC-ES2L MPI-M.MPI-ESM1-2-LR  NorESM2-MM)
+    # allScens=( ssp245 ssp370 ssp585 hist ) #
+    allScens=( ssp370 ssp585 hist ) #
 
-#### CESM2 large ensemble (under development) ####
+#### CESM2 large ensemble (under development, not tested for 3hr yet) ####
 elif [[ "${CMIP}" == "CESM2" ]]; then
 
-    #cesm2-le.010.hist-ssp370
-    path_in=/glade/campaign/ral/hap/bert/CESM2/livneh/regrid_input
-    path_out=/glade/campaign/ral/hap/bert/CESM2/livneh/bias_corrected
-
+    # #cesm2-le.010.hist-ssp370
     # allMods=( cesm2-le.010.hist )
     allMods=( cesm2-le.008.hist cesm2-le.010.hist ) #cesm2-le.009.hist )
     allScens=( ssp370 )

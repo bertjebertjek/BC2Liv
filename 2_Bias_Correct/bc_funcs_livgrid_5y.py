@@ -101,8 +101,6 @@ def correct_precip(this_ds, dsObs, dsRef,  bc_by_month=False, noise=True, verbos
     except:
         da_pcp    =  this_ds
 
-    # dsObs =  dsObs#.load()
-
     print("      ", time.time() - t0)
 
     if verbose:
@@ -117,6 +115,7 @@ def correct_precip(this_ds, dsObs, dsRef,  bc_by_month=False, noise=True, verbos
     if tdelta_int<24:
         print("   making daily precip")
         daily = da_pcp.resample(time='1D').sum(dim='time').load()
+        print(f"      max daily input precipitation value is {np.nanmax(daily.values) } kg m-2")
     else:
         daily = da_pcp.load()
     print("      ", time.time() - t0)
@@ -143,6 +142,7 @@ def correct_precip(this_ds, dsObs, dsRef,  bc_by_month=False, noise=True, verbos
     print("   quantile mapping")
 
     # NB: (very small) negative values are introduced by the bc procedure when setting extrapolate='1to1'. (This does not happen when dsRef=None. ). To prevent this we set extrapolate to max. (2024-04-18)
+    # NB2: extrapolate='max' is not a good solution, as it introduces large extremes. (2024-11-19). GOing back to '1to1' and correcting negative values afterwards . (2024-11-19)
     if verbose:
         print(f"   daily_n shape: {daily_n.shape}")
         print(f"   dsRef_n shape: {dsRef_n.shape}")
@@ -152,21 +152,30 @@ def correct_precip(this_ds, dsObs, dsRef,  bc_by_month=False, noise=True, verbos
             # def quantile_mapping_by_group(input_data, ref_data, data_to_match, (ref should exclude 5y input)
             daily_n,  dsRef_n, dsObs, # correct to liv grid
             grouper='time.month', detrend=False,  use_ref_data=True,# use_ref_data is not used! set ref_data=None to exclude ref data!
-            extrapolate="max", n_endpoints=50
+            # extrapolate="max", n_endpoints=50
+            extrapolate="1to1", n_endpoints=50 #2024-11-19
             )
     else:  #def quantile_mapping(input_data, ref_data, data_to_match,...
         bc_daily = quantile_mapping.quantile_mapping(
             daily_n, dsRef_n, dsObs,  #daily, dsRef, dsObs,#
             detrend=False,  use_ref_data=True,
-            extrapolate="max", n_endpoints=50
+            extrapolate="1to1", n_endpoints=50
             )
 
     print("      ", time.time() - t0)
 
+    print(f"      max daily output precipitation value is {np.nanmax(bc_daily.values) } kg m-2")
     if np.count_nonzero(bc_daily.values<0) >0:
         print(f"\n ! ! !   {np.count_nonzero(daily_n.values<0)} negative precip values before bc ! ! ! ")
         print(f" ! ! !   {np.count_nonzero(bc_daily.values<0)} negative precip values after bc ! ! ! ")
-        print(f" ! ! !   {np.nanmin(bc_daily.values)} minimum precip value after bc ! ! ! \n")
+        print(f" ! ! !   {np.nanmin(bc_daily.values)} minimum precip value after bc ! ! ! ")
+        # set negative values to 0:
+        print("   setting negative values to 0  \n")
+
+        bc_daily.values[bc_daily.values<0] = 0
+        if np.count_nonzero(bc_daily.values<0) >0:
+                print(f"\n ! ! !   {np.count_nonzero(bc_daily.values<0)} negative precip values after correcting ! ! ! \n")
+
     t0 = time.time()
 
     if verbose:

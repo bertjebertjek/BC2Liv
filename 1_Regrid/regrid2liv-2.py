@@ -298,11 +298,15 @@ if __name__ == '__main__':
 
             # - - -   add relative humidity to ds - - -
             if calc_relhum:
+                print("   adding relative humidity to dataset")
+                print( dsICAR.data_vars )
                 dsICAR = add_relhum_to_ds( dsICAR )
+                print( dsICAR.data_vars , "\n")
 
             # - - - - mask lakes  - - - -
             """I would recommend a fill 1 grid cell in all directions first to minimize the distance you are filling from, then a fill W->E all the way across to fill in all the lakes.  Then when it is regridded, you will be regridding to a dataset (livneh) that doesn't have "lakes" in it to begin with other than great salt lake, so if people use the data, they are mosly thinking of it as "land" air temperatures anyway. But we should have a value at all the gridcells the Livneh dataset as a value."""
             if CMIP=="CMIP6" and mask:
+                print(f"   masking lakes in ta2m")
                 geo = xr.open_dataset(geo_file)
                 msk = (geo.isel(Time=0).LANDMASK==1).values
                 # dsICAR = dsICAR.where(msk)
@@ -322,7 +326,6 @@ if __name__ == '__main__':
                 dsICAR = crop_nan(dsICAR, crop_size)
 
                 # print(f" After cropping {crop_size} cells: dsICAR['lon'].shape is ",dsICAR['lon'].shape )
-                print(f"   masking lakes in ta2m")
             dsICAR = dsICAR.load()
 
 

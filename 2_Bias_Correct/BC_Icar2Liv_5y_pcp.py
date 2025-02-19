@@ -51,6 +51,8 @@ ref_start = '1950-01-01'  # the range of the reference dataset that overlaps wit
 # ref_end   = '2014-12-31'   # '2004-12-31' for CMIP5!
 ref_end   = '2018-12-31'
 
+greatlakes=True  # if true, use the great lakes domain, else WUS domain.
+
 ############################################
 #                functions
 ############################################
@@ -125,28 +127,6 @@ def get_icar_filelist(start_year, end_year, dt="3hr"): #,base_in=""):
     return sorted(files)
 
 
-# def get_icar_filelist_CMIP5(start_year, end_year, dt="daily"): # Ryan has CMIP5 daily w/o cp, so use those for reference:
-#     # NEED TO REGRID FIRST!!! !!!
-#     base_CMIP5 = "/glade/campaign/ral/hap/currierw/icar/output"
-
-#     if scen[:4]=="hist" and CMIP=="CMIP5":
-#         scen_load="rcp45"
-#     else:
-#         scen_load=scen
-
-#     files=[]
-#     for y in range(int(start_year), int(end_year)+1) :
-
-#         if CMIP=="CMIP5":
-#             files.extend( glob.glob(f'{base_CMIP5}/{model}_historical/{dt}/icar_*_{y}*.nc') )
-#             files.extend( glob.glob(f'{base_CMIP5}/{model}_{scen_load}_2005_2050/{dt}/icar_*_{y}*.nc') )
-#             files.extend( glob.glob(f'{base_CMIP5}/{model}_{scen_load}_2050_2100/{dt}/icar_*_{y}*.nc') )
-
-#     err_path=f'{base_CMIP5}/{model}_{scen_load}_XXXX'
-#     if len(files)==0: print(f"\n ERROR: could not load files from {err_path}")
-
-#     return sorted(files)
-
 
 def get_livneh(icar_1file):
     """get livneh data, cropped to the icar grid (defined by icar_1file)"""
@@ -209,11 +189,6 @@ def relative_humidity(t,qv,p):
 def get_dsRef_full(ref_start, ref_end):
     """returns the full reference dataset, cropped to the ICAR grid"""
 
-    # print("      Memory use before loading anythng:")
-    # # Getting % usage of virtual_memory ( 3rd field)
-    # print('      * * *   RAM memory % used:', psutil.virtual_memory()[2], '   * * *   ')
-    # # Getting usage of virtual_memory in GB ( 4th field)
-    # print('      * * *   RAM Used (GB):', psutil.virtual_memory()[3]/1000000000, '   * * *   ')
 
     # # get file list for full ref period: !! try to load daily, otherwise 3hr, then make daily files, cause we need daily for bias correction.
     files_ref = get_icar_filelist(ref_start.split('-')[0], ref_end.split('-')[0], dt="daily")
@@ -228,8 +203,9 @@ def get_dsRef_full(ref_start, ref_end):
     try:
         dsR       = xr.open_mfdataset( files_ref)
     except:
+        ### N.B. this can lead to excessive precipitation values in the bias correction. Not sure why. Better to manually combine files into complete ones before this step.
         dsR       = xr.open_mfdataset( files_ref, combine='nested', compat='override')
-        print(f"\n   !!! Warning: issues combining ref data were circumvented by using compat='override' !!! \n")
+        print(f"\n   !!! Warning: issues combining ref data were circumvented by using compat='override' !!! \n !!! This can lead to issues with bias correction !!! \n")
 
     if 'precip_dt' in dsR.data_vars:
         pcp_var_R='precip_dt'
@@ -322,15 +298,22 @@ if __name__ == '__main__':
 
     # set paths based on cmip:
     if CMIP=="CMIP6":
+        ## WUS:
         base_in  = f"/glade/derecho/scratch/bkruyt/{CMIP}/WUS_icar_LivGrd3"   # lakes masked in ta2m only
-        path_out = f"/glade/campaign/ral/hap/bert/{CMIP}/WUS_icar_livBC3"  # <--- !! lakes maskes ta2m only
-        # path_out = f"/glade/campaign/ral/hap/bert/{CMIP}/WUS_icar_livBC4" # test for ta2m anomaly
+        # path_out = f"/glade/campaign/ral/hap/bert/{CMIP}/WUS_icar_livBC3"  # extrapolate = 'max' in quantile mapping
+        path_out = f"/glade/campaign/ral/hap/bert/{CMIP}/WUS_icar_livBC4" #  extrapolate = '1to1' in quantile mapping
+        # ## great lakes:
+        if greatlakes:
+            # base_in  = f"/glade/derecho/scratch/bkruyt/{CMIP}/GL_LivGrd" # lake mask ta2m + relhum #
+            base_in  = f"/glade/campaign/ral/hap/bert/CMIP6/greatlakes/GL_livgrid_rh2m"
+            path_out = f"/glade/campaign/ral/hap/bert/{CMIP}/greatlakes/GL_livBC" #  extrapolate = '1to1' in quantile mapping
+
     elif CMIP=="CMIP5":
         base_in  = f"/glade/derecho/scratch/bkruyt/{CMIP}/WUS_icar_LivGrd4" # lakes masked in ta2m only, correct cp removed 20240817
-        path_out = f"/glade/campaign/ral/hap/bert/{CMIP}/WUS_icar_livBC4"
+        path_out = f"/glade/campaign/ral/hap/bert/{CMIP}/WUS_icar_livBC4"# extrapolate = 'max' in quantile mapping
     elif CMIP=="CESM2":
         base_in  = f"/glade/campaign/ral/hap/bert/CESM2/livneh/regrid_input" # lakes masked in ta2m only, correct cp removed 20240817
-        path_out = f"/glade/campaign/ral/hap/bert/CESM2/livneh/bias_corrected"
+        path_out = f"/glade/campaign/ral/hap/bert/CESM2/livneh/bias_corrected" # extrapolate = 'max' in quantile mapping
 
     verbose=True  # more print statements at runtime.
 

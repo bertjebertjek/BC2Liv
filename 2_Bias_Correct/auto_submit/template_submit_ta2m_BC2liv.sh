@@ -47,7 +47,7 @@ for model in ${allMods[@]} ; do
 # 1. First launch a dependent job for the ta2m BC: (this will run after the pcp bc in 2.)
 # (EOS: The text between the delimiting identifiers (EOS in this case) is redirected to the command.)
 
-cat <<EOS | qsub - #W depend=afterany:${PBS_JOBID}
+cat <<EOS | qsub
     #!/bin/bash
 
     #PBS -l select=1:ncpus=1:mem=150GB

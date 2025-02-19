@@ -38,11 +38,14 @@ warnings.simplefilter("ignore", category=Warning) #SerializationWarning ?
 ############################################
 #                Settings
 ############################################
+
+greatlakes=True  # if true, use the great lakes domain, else WUS domain.
+
 bc_by_month=True
 
 test = False # reduces datasets for faster processing, incorrect results!
 
-calc_relhum = False # !! now done on icar grid before BC!!  # add a relative humidity variable to the dataset, by calculating this from (corrected) ta2m and qv
+calc_relhum = False # !! now done on icar grid before BC!! # calculate relative humidity from ta2m and qv
 
 dropvars=True   # drop variables in vars_to_drop (below). Also writes to "3hr" subdir iso "3hr_ta2m" !
 
@@ -306,11 +309,18 @@ if __name__ == '__main__':
 
         # set paths based on cmip:
     if CMIP=="CMIP6":
-        # base_in  = f"/glade/campaign/ral/hap/bert/{CMIP}/WUS_icar_livBC3" # PCP in! # ta2m mased correctlt
-        ref_in   = f"/glade/derecho/scratch/bkruyt/{CMIP}/WUS_icar_LivGrd3"  # referenece files
-        path_out = f"/glade/campaign/ral/hap/bert/{CMIP}/WUS_icar_livBC3"
-        # path_out = f"/glade/campaign/ral/hap/bert/{CMIP}/WUS_icar_livBC4" # test for ta2m anomaly
+
+        ## great lakes:
+        if greatlakes:
+            ref_in  = f"/glade/campaign/ral/hap/bert/CMIP6/greatlakes/GL_livgrid_rh2m"
+            # ref_in  = f"/glade/derecho/scratch/bkruyt/${CMIP}/GL_LivGrd" # lake mask ta2m + relhum
+            path_out = f"/glade/campaign/ral/hap/bert/{CMIP}/greatlakes/GL_livBC" #  extrapolate = '1to1' in quantile mapping
+        else:  ## WUS:
+            ref_in   = f"/glade/derecho/scratch/bkruyt/{CMIP}/WUS_icar_LivGrd3"  # referenece files
+            # path_out = f"/glade/campaign/ral/hap/bert/{CMIP}/WUS_icar_livBC3"  # extrapolate = 'max' in quantile mapping
+            path_out = f"/glade/campaign/ral/hap/bert/{CMIP}/WUS_icar_livBC4" #  extrapolate = '1to1' in quantile mapping
         base_in  = path_out
+
     elif CMIP=="CMIP5":
         base_in = f"/glade/campaign/ral/hap/bert/{CMIP}/WUS_icar_livBC4" # BC PCP as input
         ref_in  = f"/glade/derecho/scratch/bkruyt/{CMIP}/WUS_icar_LivGrd4"
